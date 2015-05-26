@@ -224,4 +224,12 @@ public class TspReadyTask extends ReadyTask<TspData> {
 		}
 		return result;
 	}
+	
+	@Override
+	public boolean isCoarse() {
+		if (getLayer() <= 3)
+			return true;
+		else
+			return false;
+	}
 }

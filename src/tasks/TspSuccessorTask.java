@@ -57,4 +57,12 @@ public class TspSuccessorTask extends SuccessorTask<TspData> {
 				this.getTargetTaskID(), this.getTargetSuccessorTaskArgIndex(),
 				taskStartTime, taskEndTime);
 	}
+	
+	@Override
+	public boolean isCoarse() {
+		if (getLayer() <= 3)
+			return true;
+		else
+			return false;
+	}
 }

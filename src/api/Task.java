@@ -127,10 +127,5 @@ public abstract class Task implements Serializable {
 		this.layer = layer;
 	}
 	
-	public boolean isCoarse() {
-		if (layer <= 3)
-			return true;
-		else
-			return false;
-	}
+	public abstract boolean isCoarse();
 }

@@ -120,4 +120,11 @@ public class FibonacciReadyTask extends ReadyTask<Integer> {
 		}
 	}
 
+	@Override
+	public boolean isCoarse() {
+		if (getLayer() <= 3)
+			return true;
+		else
+			return false;
+	}
 }

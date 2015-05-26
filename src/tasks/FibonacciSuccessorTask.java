@@ -50,4 +50,12 @@ public class FibonacciSuccessorTask extends SuccessorTask<Integer> {
 				this.getTargetTaskID(), this.getTargetSuccessorTaskArgIndex(),
 				taskStartTime, taskEndTime);
 	}
+	
+	@Override
+	public boolean isCoarse() {
+		if (getLayer() <= 3)
+			return true;
+		else
+			return false;
+	}
 }
