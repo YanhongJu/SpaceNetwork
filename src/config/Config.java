@@ -25,4 +25,9 @@ public class Config {
 	 * Flag of Status Output
 	 */
 	public final static boolean STATUSOUTPUT = true;
+	
+	/**
+	 * Flag of debug Output
+	 */
+	public static final boolean DEBUG = true;
 }

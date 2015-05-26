@@ -127,7 +127,7 @@ public abstract class Result implements Serializable {
 	/**
 	 * Get the result type.
 	 * 
-	 * @return the resultType 0 if it is Value Result. 1 If it is Task Result.
+	 * @return the resultType 0 if it is Value Result. 1 if it is Task Result.
 	 */
 	public int getResultType() {
 		return this.ResultType;
@@ -144,35 +144,36 @@ public abstract class Result implements Serializable {
 	}
 
 	/**
-	 * Process the result. Call from Space.
+	 * Process the result. Call from Computer Proxy in Space.
 	 * 
 	 * @param space
-	 *            The Space implemetation in which the result is to be
+	 *            The Space implementation in which the result is to be
 	 *            processed.
 	 * @param ComputerProxyRunningTaskMap
 	 *            The Running Task Map in the Computer Proxy, where the
 	 *            associated task is stored.
 	 * @param resultQueue
-	 *            Temporary Result Queue in which the result can be stored if
-	 *            result processing failed.
+	 *            Intermediate Result Queue in which the result can be stored
+	 *            after Space Direct Execution.
 	 * @return The status of processing. True if processed successfully, false
 	 *         otherwise.
 	 */
-	public abstract boolean process(final SpaceImpl space,
+	public abstract void process(final SpaceImpl space,
 			final Map<String, Task> runningTaskMap,
 			final BlockingQueue<Result> resultQueue);
 
 	/**
-	 * Process the Result. Call from Universe.
+	 * Process the Result. Call from Space Proxy in Universe.
 	 * 
 	 * @param universe
 	 *            Universe
 	 * @param runningTaskMap
-	 *            The running Task Map in the Space Proxy.
+	 *            The running Task Map in the Space Proxy, where the associated
+	 *            task is stored.
 	 * @return The status of processing. True if processed successfully, false
 	 *         otherwise.
 	 */
-	public abstract boolean process(final UniverseImpl universe,
+	public abstract void process(final UniverseImpl universe,
 			final Map<String, Task> runningTaskMap);
 
 	/**

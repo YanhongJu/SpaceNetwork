@@ -23,10 +23,6 @@ import tasks.TspReadyTask;
 public class ClientTsp extends ClientImpl<List<Integer>> {
 	private static final long serialVersionUID = 4192126821917742620L;
 	private static final int NUM_PIXALS = 600;
-	
-	static final double[][] CITIES = { { 1, 1 }, { 8, 1 }, { 8, 8 }, { 1, 8 },
-			{ 2, 2 }, { 7, 2 }, { 7, 7 }, { 2, 7 }, { 3, 3 }, { 6, 3 },
-			{ 6, 6 }, { 3, 6 } };
 
 	/**
 	 * Prepare a TSP Ready Task
@@ -38,42 +34,45 @@ public class ClientTsp extends ClientImpl<List<Integer>> {
 	public static ReadyTask<TspData> makeReadyTask(final double[][] cities) {
 		double[][] distance = calDistance(cities);
 		final int numOfCities = cities.length;
-		List<Integer> ordered = new ArrayList<Integer> ();
+		List<Integer> ordered = new ArrayList<Integer>();
 		ordered.add(0);
-		List<Integer> unordered = new ArrayList<Integer> ();
-		for (int i=1; i<numOfCities; ++i)
+		List<Integer> unordered = new ArrayList<Integer>();
+		for (int i = 1; i < numOfCities; ++i)
 			unordered.add(i);
-		
+
 		TspData data = new TspData(-8, ordered, unordered);
-		
-		List<TspData> args = new ArrayList<TspData> ();
+
+		List<TspData> args = new ArrayList<TspData>();
 		args.add(data);
-		
+
 		return new TspReadyTask(args, numOfCities, distance);
 	}
-	
-	public ClientTsp(String domainName) throws RemoteException, NotBoundException,
-			MalformedURLException {
+
+	public ClientTsp(String domainName) throws RemoteException,
+			NotBoundException, MalformedURLException {
 		super("TSP", domainName);
 	}
 
 	@SuppressWarnings("unchecked")
 	public static void main(String[] args) throws Exception {
 		System.setSecurityManager(new SecurityManager());
-		
+
 		String ServerDomainName = args.length == 0 ? "localhost" : args[0];
 		ClientTsp client = new ClientTsp(ServerDomainName);
-		
+
 		client.begin();
+		double[][] CITIES = { { 1, 1 }, { 8, 1 }, { 8, 8 }, { 1, 8 },
+				{ 2, 2 }, { 7, 2 }, { 7, 7 }, { 2, 7 }, { 3, 3 }, { 6, 3 },
+				{ 6, 6 }, { 3, 6 } };
 		ReadyTask<TspData> tspTask = makeReadyTask(CITIES);
 		client.addTask(tspTask);
-		
+
 		ValueResult<TspData> result = (ValueResult<TspData>) client.getResult();
 		TspData tspData = result.getResultValue();
 		List<Integer> minTour;
 		minTour = tspData.getOrderedCities();
 		minTour.add(0);
-		
+
 		client.add(client.getLabel(minTour.toArray(new Integer[0]), CITIES));
 		client.end();
 	}
@@ -151,7 +150,7 @@ public class ClientTsp extends ClientImpl<List<Integer>> {
 		}
 		return stringBuilder.toString();
 	}
-	
+
 	private static double[][] calDistance(double[][] CITIES) {
 		int numOfCities = CITIES.length;
 		double[][] distance = new double[numOfCities][numOfCities];

@@ -74,7 +74,8 @@ public class TaskResult extends Result {
 	}
 
 	/**
-	 * Process the result. Call from Space.
+	 * Process the result. Call from Space. Put Successor Task in the Successor
+	 * Task Map, put Ready Task into the Ready Task Queue.
 	 * 
 	 * @param space
 	 *            The Space implemetation in which the result is to be
@@ -87,7 +88,7 @@ public class TaskResult extends Result {
 	 *            result processing failed.
 	 */
 	@Override
-	public boolean process(final SpaceImpl space,
+	public void process(final SpaceImpl space,
 			final Map<String, Task> RunningTaskMap,
 			final BlockingQueue<Result> intermediateResultQueue) {
 		if (Config.AmeliorationFlag) {
@@ -98,8 +99,7 @@ public class TaskResult extends Result {
 			}
 
 			// First task in subtasks is a successor. Put it into Space's
-			// Successor
-			// Task Queue.
+			// Successor Task Queue.
 			space.addSuccessorTask(subTasks.get(0));
 
 			// Put rest tasks in subtasks into Space's Ready Task Queue.
@@ -115,12 +115,21 @@ public class TaskResult extends Result {
 				space.addReadyTask(subTasks.get(i));
 			}
 		}
-		return true;
 	}
 
+	/**
+	 * Process the Result. Call from Space Proxy in Universe. Put Successor Task
+	 * in the Successor Task Map, put Ready Task into the Ready Task Queue.
+	 * 
+	 * @param universe
+	 *            Universe
+	 * @param runningTaskMap
+	 *            The running Task Map in the Space Proxy.
+	 * @return The status of processing. True if processed successfully, false
+	 *         otherwise.
+	 */
 	@Override
-	public boolean process(UniverseImpl universe,
-			Map<String, Task> runningTaskMap) {
+	public void process(UniverseImpl universe, Map<String, Task> runningTaskMap) {
 		for (int i = 0; i < runningTasks.size(); i++) {
 			universe.addReadyTask(runningTasks.get(i));
 		}
@@ -128,7 +137,6 @@ public class TaskResult extends Result {
 		for (int i = 1; i < subTasks.size(); i++) {
 			universe.addReadyTask(subTasks.get(i));
 		}
-		return true;
 	}
 
 }

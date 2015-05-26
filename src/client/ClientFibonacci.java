@@ -1,6 +1,7 @@
 package client;
 
 import java.net.MalformedURLException;
+import java.rmi.Naming;
 import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 import java.util.ArrayList;
@@ -8,6 +9,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import result.ValueResult;
+import server.Server;
 import task.ReadyTask;
 import tasks.FibonacciReadyTask;
 
@@ -54,9 +56,14 @@ public class ClientFibonacci extends ClientImpl<Integer> {
 
 		String ServerDomainName = args.length == 0 ? "localhost" : args[0];
 		// Instantiate a Client Fibonacci.
-		ClientFibonacci client = null;
+		ClientImpl client = null;
 		try {
 			client = new ClientFibonacci(ServerDomainName);
+			String url = "rmi://" + ServerDomainName + ":" + Server.PORT + "/"
+					+ Server.SERVICE_NAME;
+			Server server;
+			server = (Server) Naming.lookup(url);
+			server.register(client);
 		} catch (RemoteException e) {
 			e.printStackTrace();
 			System.out.println("Cannot regiseter to the Server!");
@@ -68,7 +75,7 @@ public class ClientFibonacci extends ClientImpl<Integer> {
 		}
 		client.begin();
 
-		int N = 20;
+		int N = 10;
 		// Prepare a Task
 		ReadyTask<Integer> fibTask = makeReadyTask(N);
 		// Put it into Ready Task Queue.

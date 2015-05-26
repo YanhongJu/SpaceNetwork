@@ -22,50 +22,41 @@ public interface Computer extends Remote {
 	public void setID(int computerId) throws RemoteException;
 
 	/**
-	 * Get Computer ID. Call from Space.
+	 * Get the number of Workers running in the Computer. Call from Space.
 	 * 
-	 * @return Computer ID
+	 * @return Number of Workers.
 	 * @throws RemoteException
-	 *             Failed to connect to computer.
+	 *             Failed to connect to Computer.
 	 */
-	public int getID() throws RemoteException;
+	public int getWorkerNum() throws RemoteException;
 
 	/**
-	 * Get the number of processes running in the Computer. Call from Space.
-	 * 
-	 * @return Number of processes.
-	 * @throws RemoteException
-	 *             Failed to connect to computer.
-	 */
-	public int getProcessNum() throws RemoteException;
-
-	/**
-	 * Add a task to local ready task queue. Call from Space.
+	 * Add a task to Ready Task Queue. Call from Computer Proxy in Space.
 	 * 
 	 * @param task
-	 *            The task to be added.
+	 *            The Task to be added.
 	 * @throws RemoteException
-	 *             Failed to connect to computer.
+	 *             Failed to connect to Computer.
 	 */
 	public void addTask(Task task) throws RemoteException;
 
 	/**
-	 * Take result from local result queue. Call from Space.
+	 * Get a Result from Result Queue. Call from Computer Proxy in Space.
 	 * 
-	 * @return The execution result.
+	 * @return The execution Result.
 	 * @throws RemoteException
 	 *             Failed to connect to computer.
 	 */
-	public Result takeResult() throws RemoteException;
+	public Result getResult() throws RemoteException;
 
 	/**
-	 * Execute the task.
+	 * Execute the Task.
 	 * 
 	 * @param task
-	 *            The task to be executed.
+	 *            The Task to be executed.
 	 * @return Result of the execution.
 	 * @throws RemoteException
-	 *             Failed to connect to computer.
+	 *             Failed to connect to Computer.
 	 * 
 	 */
 	public Result execute(Task task) throws RemoteException;
@@ -74,7 +65,7 @@ public interface Computer extends Remote {
 	 * Exit
 	 * 
 	 * @throws RemoteException
-	 *             Failed to connect to computer.
+	 *             Failed to connect to Computer.
 	 */
 	public void exit() throws RemoteException;
 

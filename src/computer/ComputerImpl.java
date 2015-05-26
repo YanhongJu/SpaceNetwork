@@ -45,15 +45,15 @@ public class ComputerImpl extends UnicastRemoteObject implements Computer {
 	private final BlockingQueue<Result> resultQueue;
 
 	/**
-	 * Number of processes, same as number of task proxies.
+	 * Number of Workers
 	 */
-	private final int ProcessNum;
+	private final int workerNum;
 
 	/**
 	 * Task Proxy Threads.
 	 */
 	private final Worker[] workers;
-	
+
 	/**
 	 * Space
 	 */
@@ -74,17 +74,17 @@ public class ComputerImpl extends UnicastRemoteObject implements Computer {
 		}
 		if (Config.ComputerMultithreadFlag) {
 			// Get available processors in JVM
-			ProcessNum = Runtime.getRuntime().availableProcessors();
+			workerNum = Runtime.getRuntime().availableProcessors();
 		} else {
-			ProcessNum = 1;
+			workerNum = 1;
 		}
-		workers = new Worker[ProcessNum];
-		for (int i = 0; i < ProcessNum; i++) {
+		workers = new Worker[workerNum];
+		for (int i = 0; i < workerNum; i++) {
 			workers[i] = new Worker();
 			workers[i].start();
 		}
 		Logger.getLogger(ComputerImpl.class.getName()).log(Level.INFO,
-				"Computer: started with " + ProcessNum + " threads.");
+				"Computer: started with " + workerNum + " workers.");
 	}
 
 	public static void main(String[] args) throws Exception {
@@ -120,38 +120,25 @@ public class ComputerImpl extends UnicastRemoteObject implements Computer {
 	}
 
 	/**
-	 * Get Computer ID. Call from Space.
+	 * Get the number of Workers running in the Computer. Call from Space.
 	 * 
-	 * @return Computer ID.
+	 * @return Number of Workers.
 	 * @throws RemoteException
 	 *             Failed to connect to computer.
 	 */
 	@Override
-	public int getID() throws RemoteException {
-		return this.ID;
+	public int getWorkerNum() throws RemoteException {
+		return workerNum;
 	}
 
 	/**
-	 * Get the number of processes running in the Computer. Call from Space.
-	 * 
-	 * @return Number of processes.
-	 * @throws RemoteException
-	 *             Failed to connect to computer.
-	 */
-	@Override
-	public int getProcessNum() throws RemoteException {
-		return ProcessNum;
-	}
-
-	/**
-	 * Add a task to local ready task queue. Call from Space.
+	 * Add a task to Ready Task Queue. Call from Computer Proxy in Space.
 	 * 
 	 * @param task
-	 *            Task to be added.
+	 *            The Task to be added.
 	 * @throws RemoteException
-	 *             Failed to connect to computer.
+	 *             Failed to connect to Computer.
 	 */
-
 	@Override
 	public void addTask(Task task) throws RemoteException {
 		try {
@@ -162,20 +149,40 @@ public class ComputerImpl extends UnicastRemoteObject implements Computer {
 	}
 
 	/**
-	 * Take result from local result queue. Call from Space.
+	 * Get a Result from Result Queue. Call from Computer Proxy in Space.
 	 * 
-	 * @return Reult of the execution.
+	 * @return The execution Result.
 	 * @throws RemoteException
-	 *             Failed to connect computer.
+	 *             Failed to connect to computer.
 	 */
 	@Override
-	public Result takeResult() throws RemoteException {
-		Result result = null;
-		result = resultQueue.poll();
-		return result;
+	public Result getResult() throws RemoteException {
+		return resultQueue.poll();
 	}
 
 	/**
+	 * Get a Task from the Ready Task Queue.
+	 * 
+	 * @return Task
+	 */
+	private Task getReadyTask() {
+		try {
+			return readyTaskQueue.take();
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+		return null;
+	}
+
+	private void addResult(Result result) {
+		try {
+			resultQueue.put(result);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+	}
+
+	/*
 	 * Execute the task and generate the result. Assign every subtask with an
 	 * task ID.
 	 */
@@ -187,20 +194,20 @@ public class ComputerImpl extends UnicastRemoteObject implements Computer {
 		if (result.getResultType() == Result.VALUERESULT) {
 			return result;
 		} else {
-			// If the result is Task Result, assgin subtasks with Task ID.
+			// If the result is Task Result, assign subtasks with Task ID.
 			List<Task> subtasks = ((TaskResult) result).getSubTasks();
 			// Assign Successor Task with an Task ID
 			Task successor = subtasks.get(0);
-			String successorTaskID = ID + ":"
+			String successorTaskID = successor.getTaskID() + ":" + ID + ":"
 					+ Thread.currentThread().getId() + ":"
 					+ taskID.getAndIncrement();
 			successor.setTaskID(successorTaskID);
 			// Assign other Ready Task with Task IDs
 			for (int i = 1; i < subtasks.size(); i++) {
-				String taskid = ID + ":"
+				Task subtask = subtasks.get(i);
+				String taskid = subtask.getTaskID() + ":" + ID + ":"
 						+ Thread.currentThread().getId() + ":"
 						+ taskID.getAndIncrement();
-				Task subtask = subtasks.get(i);
 				subtask.setTaskID(taskid);
 				subtask.setTargetTaskID(successorTaskID);
 			}
@@ -208,10 +215,10 @@ public class ComputerImpl extends UnicastRemoteObject implements Computer {
 			// Ready Task Queue
 			List<Task> runningtasks = ((TaskResult) result).getRunningTask();
 			for (int i = 0; i < runningtasks.size(); i++) {
-				String taskid = ID + ":"
+				Task runningtask = runningtasks.get(i);
+				String taskid = runningtask.getTaskID() + ":" + ID + ":"
 						+ Thread.currentThread().getId() + ":"
 						+ taskID.getAndIncrement();
-				Task runningtask = runningtasks.get(i);
 				runningtask.setTaskID(taskid);
 				runningtask.setTargetTaskID(successorTaskID);
 			}
@@ -238,29 +245,24 @@ public class ComputerImpl extends UnicastRemoteObject implements Computer {
 
 	/**
 	 * 
-	 * A Worker is a thread to get tasks from Computer Ready Queue and
-	 * execute them, put the results into Computer Result Task Queue.
+	 * A Worker is a thread to get tasks from Computer Ready Queue and execute
+	 * them, put the results into Computer Result Task Queue.
 	 *
 	 */
 	private class Worker extends Thread {
 		@Override
 		public void run() {
 			while (true) {
-				Task task = null;
-				try {
-					task = readyTaskQueue.take();
-					Result result = execute(task);
-					resultQueue.put(result);
-					if (Config.AmeliorationFlag) {
-						if (result.getResultType() == Result.TASKRESULT) {
-							cacheTasks((TaskResult) result);
-						}
+				Task task = getReadyTask();
+				Result result = execute(task);
+				addResult(result);
+				if (Config.AmeliorationFlag) {
+					if (!result.isCoarse() && result.getResultType() == Result.TASKRESULT) {
+						cacheTasks((TaskResult) result);
 					}
-					if (Config.STATUSOUTPUT) {
-						System.out.println(result.getResultId());
-					}
-				} catch (InterruptedException e) {
-					e.printStackTrace();
+				}
+				if (Config.STATUSOUTPUT) {
+					System.out.println(result.getResultId());
 				}
 			}
 		}

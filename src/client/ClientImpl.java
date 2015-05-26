@@ -2,10 +2,12 @@ package client;
 
 import java.awt.BorderLayout;
 import java.awt.Container;
+import java.io.Serializable;
 import java.net.MalformedURLException;
 import java.rmi.Naming;
 import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
+import java.rmi.server.UnicastRemoteObject;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.logging.Level;
@@ -15,11 +17,12 @@ import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JScrollPane;
 
+import config.Config;
 import api.Result;
 import api.Task;
 import server.Server;
 
-public class ClientImpl<T> extends JFrame implements Client {
+public class ClientImpl<T> extends JFrame implements Client, Serializable {
 	private static final long serialVersionUID = -4472984886617837870L;
 	protected T taskReturnValue;
 	private long clientStartTime;
@@ -60,18 +63,14 @@ public class ClientImpl<T> extends JFrame implements Client {
 	 */
 	public ClientImpl(final String title, final String ServerDomainName)
 			throws NotBoundException, MalformedURLException, RemoteException {
-		setTitle(title);
-		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+//		setTitle(title);
+	//	setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
 		readyTaskQueue = new LinkedBlockingQueue<>();
 		resultQueue = new LinkedBlockingQueue<>();
 		taskIDQueue = new LinkedBlockingQueue<>();
 
-		String url = "rmi://" + ServerDomainName + ":" + Server.PORT + "/"
-				+ Server.SERVICE_NAME;
-		Server server;
-		server = (Server) Naming.lookup(url);
-		server.register(this);
+
 	}
 
 	/**
@@ -87,14 +86,6 @@ public class ClientImpl<T> extends JFrame implements Client {
 		this.ID = clientID;
 	}
 
-	/**
-	 * Get the Client ID.
-	 * 
-	 * @return ID
-	 */
-	public int getID() {
-		return this.ID;
-	}
 
 	/**
 	 * Add a Task to Ready Task Queue.
@@ -105,6 +96,10 @@ public class ClientImpl<T> extends JFrame implements Client {
 	public void addTask(Task task) {
 		try {
 			readyTaskQueue.put(task);
+			if (Config.DEBUG) {
+				System.out.println("Client: Task is put.");
+				System.out.println("Client: " + "Ready Task Queue Size is " + readyTaskQueue.size());
+			}
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
@@ -120,6 +115,12 @@ public class ClientImpl<T> extends JFrame implements Client {
 	@Override
 	public Task getTask() throws RemoteException {
 		try {
+			if (Config.DEBUG) {
+				System.out.println("Client: " + "Ready Task Queue Size is " + readyTaskQueue.size());
+				Task task = readyTaskQueue.take();
+				System.out.println("Client: Task is taken");
+				return task;
+			}
 			return readyTaskQueue.take();
 		} catch (InterruptedException e) {
 			e.printStackTrace();
@@ -208,12 +209,17 @@ public class ClientImpl<T> extends JFrame implements Client {
 	 * @param jLabel
 	 *            label
 	 */
-	public void add(final JLabel jLabel) {
+/*	public void add(final JLabel jLabel) {
 		final Container container = getContentPane();
 		container.setLayout(new BorderLayout());
 		container.add(new JScrollPane(jLabel), BorderLayout.CENTER);
 		pack();
 		setVisible(true);
+	}*/
+
+	@Override
+	public int getID() throws RemoteException {
+		return this.ID;
 	}
 
 }

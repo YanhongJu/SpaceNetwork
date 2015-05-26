@@ -16,6 +16,16 @@ public interface Client extends Remote {
 	 *             Failed to connect to Client.
 	 */
 	public void setID(final int clientID) throws RemoteException;
+	
+	/**
+	 * Set an ID to the Client. Call from Client Proxy in Server.
+	 * 
+	 * @param clientID
+	 *            Client Id.
+	 * @throws RemoteException
+	 *             Failed to connect to Client.
+	 */
+	public int getID() throws RemoteException;
 
 	/**
 	 * Get a Task from Ready Task Queue. Call from Client Proxy in Server.

@@ -157,10 +157,10 @@ public class SpaceImpl extends UnicastRemoteObject implements Space {
 	}
 
 	/**
-	 * Add a task to Ready Task Queue.
+	 * Add a Task to Ready Task Queue. Call from Result.
 	 * 
 	 * @param task
-	 *            The task to be added.
+	 *            Task to be added.
 	 */
 	public void addReadyTask(Task task) {
 		try {
@@ -185,13 +185,23 @@ public class SpaceImpl extends UnicastRemoteObject implements Space {
 	}
 
 	/**
-	 * Add a task to Sucessor Task Map.
+	 * Add a Successor Task to Successor Task Map.
 	 * 
 	 * @param task
-	 *            The task to be added.
+	 *            Task to be added.
 	 */
 	public void addSuccessorTask(Task task) {
 		successorTaskMap.put(task.getTaskID(), task);
+	}
+
+	/**
+	 * Remove a Successor Task from Successsor Task Map.
+	 * 
+	 * @param task
+	 *            Task to be removed.
+	 */
+	public void removeSuccessorTask(String taskID) {
+		successorTaskMap.remove(taskID);
 	}
 
 	/**
@@ -267,8 +277,8 @@ public class SpaceImpl extends UnicastRemoteObject implements Space {
 		computerProxies.put(computerproxy.ID, computerproxy);
 		computerproxy.start();
 		Logger.getLogger(this.getClass().getName()).log(Level.INFO,
-				"Computer {0} started with {1} threads",
-				new Object[] { computerproxy.ID, computer.getProcessNum() });
+				"Computer {0} started with {1} workers!",
+				new Object[] { computerproxy.ID, computer.getWorkerNum() });
 	}
 
 	/**
@@ -282,10 +292,9 @@ public class SpaceImpl extends UnicastRemoteObject implements Space {
 		computerProxies.remove(computerProxy.ID);
 		Result result = null;
 		while ((result = computerProxy.intermediateResultQueue.poll()) != null) {
-			if (result.process(space, computerProxy.runningTaskMap,
-					computerProxy.intermediateResultQueue)) {
-				computerProxy.runningTaskMap.remove(result.getResultId());
-			}
+			result.process(space, computerProxy.runningTaskMap,
+					computerProxy.intermediateResultQueue);
+			computerProxy.runningTaskMap.remove(result.getResultId());
 			if (Config.STATUSOUTPUT) {
 				System.out.println("Unregister Result: " + result.getResultId()
 						+ "!" + ((ValueResult<?>) result).getTargetTaskId());
@@ -407,26 +416,33 @@ public class SpaceImpl extends UnicastRemoteObject implements Space {
 		private class ReceiveService extends Thread {
 			@Override
 			public void run() {
-				Result result = null;
 				while (true) {
 					try {
 						// Get result from Computer Result Queue.
-						result = computer.takeResult();
+						Result result = computer.getResult();
 						if (result != null) {
 							synchronized (runningTaskMap) {
-								if (result.process(space, runningTaskMap,
-										intermediateResultQueue)) {
-									runningTaskMap.remove(result.getResultId());
+								if (result.isCoarse()) {
+									space.addResult(result);
+									removeSuccessorTask(result.getResultId());
+								} else {
+									result.process(space, runningTaskMap,
+											intermediateResultQueue);
+									removeSuccessorTask(result.getResultId());
 								}
 							}
 						}
-						// Get the result from Temporary Result Queue.
+						// Get the result from Intermediate Result Queue.
 						result = intermediateResultQueue.poll();
 						if (result != null) {
 							synchronized (runningTaskMap) {
-								if (result.process(space, runningTaskMap,
-										intermediateResultQueue)) {
-									runningTaskMap.remove(result.getResultId());
+								if (result.isCoarse()) {
+									space.addResult(result);
+									removeSuccessorTask(result.getResultId());
+								} else {
+									result.process(space, runningTaskMap,
+											intermediateResultQueue);
+									removeSuccessorTask(result.getResultId());
 								}
 							}
 						}
@@ -451,12 +467,12 @@ public class SpaceImpl extends UnicastRemoteObject implements Space {
 			@Override
 			public void run() {
 				while (true) {
-					Task task = null;
-					task = space.getReadyTask();
+					Task task = space.getReadyTask();
+					task.setTaskID(task.getTargetTaskID() + ":" + SpaceImpl.ID);
 					try {
 						synchronized (runningTaskMap) {
 							computer.addTask(task);
-							runningTaskMap.put(task.getTaskID(), task);
+							space.addSuccessorTask(task);
 						}
 					} catch (RemoteException e) {
 						System.out.println("Send Service: Computer " + ID

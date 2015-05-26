@@ -14,7 +14,7 @@ import api.Task;
  * @param <T>
  *            Argument type of the task.
  */
-abstract public class ReadyTask<T> extends Task {
+public abstract class ReadyTask<T> extends Task {
 	private static final long serialVersionUID = -998071752240333400L;
 	
 	/**

@@ -1,7 +1,6 @@
 package universe;
 
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -24,8 +23,6 @@ import server.Server;
 import space.Space;
 import api.Result;
 import api.Task;
-import space.SpaceImpl;
-import task.SuccessorTask;
 
 public class UniverseImpl extends UnicastRemoteObject implements Universe,
 		Serializable {
@@ -87,7 +84,7 @@ public class UniverseImpl extends UnicastRemoteObject implements Universe,
 	 * @throws RemoteException
 	 */
 	public UniverseImpl(String recoveryFileName) throws RemoteException {
-		System.out.println(" reading from file");
+		System.out.println("Universe is recovering...");
 		UniverseImpl readUniverse = null;
 		ObjectInputStream objectinputstream = null;
 		try {
@@ -95,6 +92,7 @@ public class UniverseImpl extends UnicastRemoteObject implements Universe,
 					recoveryFileName));
 			readUniverse = (UniverseImpl) objectinputstream.readObject();
 		} catch (Exception e) {
+			System.out.println("Universe failed to recover. Relaunching...");
 			readyTaskQueue = new LinkedBlockingQueue<>();
 			successorTaskMap = Collections.synchronizedMap(new HashMap<>());
 			serverProxies = Collections.synchronizedMap(new HashMap<>());
@@ -128,35 +126,33 @@ public class UniverseImpl extends UnicastRemoteObject implements Universe,
 				recoveryFileName);
 		LocateRegistry.createRegistry(Universe.PORT).rebind(
 				Universe.SERVICE_NAME, universe);
-
+		//Take Checkpoint periodically 
 		while (true) {
 			Thread.sleep(10000);
-			universe.saveToFile();
+	//		universe.checkPoint();
 		}
-
-		// Main thread waiting for Key Enter to terminate.
-
 	}
 
-	private void saveToFile() {
+	synchronized private void checkPoint() {
 		try {
 			FileOutputStream fout = new FileOutputStream(recoveryFileName);
 			ObjectOutputStream oos = new ObjectOutputStream(fout);
 			oos.writeObject(this);
 			oos.close();
-			System.out.println("finish writing");
+			Logger.getLogger(this.getClass().getName()).log(Level.INFO,
+					"Checkpoint is taken.");
 		} catch (Exception ex) {
 			ex.printStackTrace();
 		}
 	}
 
 	/**
-	 * Add a Task to Ready Task Queue.
+	 * Add a Task to Ready Task Queue. Call from Result.
 	 * 
 	 * @param task
 	 *            Task to be added.
 	 */
-	private void addTask(Task task) {
+	public void addReadyTask(Task task) {
 		try {
 			readyTaskQueue.put(task);
 		} catch (InterruptedException e) {
@@ -165,16 +161,25 @@ public class UniverseImpl extends UnicastRemoteObject implements Universe,
 	}
 
 	/**
+	 * Add a Successor Task to Successor Task Map.
+	 * Call from Result.
+	 * @param task
+	 *            Task to be added.
+	 */
+	public void addSuccessorTask(Task task) {
+		successorTaskMap.put(task.getTaskID(), task);
+	}
+
+	/**
 	 * Get a Task from the Ready Task Queue.
 	 * 
 	 * @return Task
 	 */
-	private Task getTask() {
+	private Task getReadyTask() {
 		try {
 			return readyTaskQueue.take();
 		} catch (InterruptedException e) {
 			if (Config.STATUSOUTPUT) {
-				e.printStackTrace();
 				System.out.println("Send Service is interrupted!");
 			}
 		}
@@ -182,7 +187,7 @@ public class UniverseImpl extends UnicastRemoteObject implements Universe,
 	}
 
 	/**
-	 * Get a task from the Successor Task Map with Task Id.
+	 * Get a task from the Successor Task Map with Task Id. Call from Result.
 	 * 
 	 * @param TaskId
 	 *            Task Id.
@@ -377,7 +382,6 @@ public class UniverseImpl extends UnicastRemoteObject implements Universe,
 				return resultQueue.take();
 			} catch (InterruptedException e) {
 				if (Config.STATUSOUTPUT) {
-					e.printStackTrace();
 					System.out.println("Receive Service is interrupted!");
 				}
 			}
@@ -392,7 +396,6 @@ public class UniverseImpl extends UnicastRemoteObject implements Universe,
 					try {
 						server.dispatchResult(result);
 					} catch (RemoteException e) {
-						e.printStackTrace();
 						System.out.println("Receive Service: Server " + ID
 								+ " is Down!");
 						return;
@@ -415,9 +418,8 @@ public class UniverseImpl extends UnicastRemoteObject implements Universe,
 					Task task = null;
 					try {
 						task = server.getTask();
-						universe.addTask(task);
+						universe.addReadyTask(task);
 					} catch (RemoteException e) {
-						e.printStackTrace();
 						System.out.println("Send Service: Server " + ID
 								+ " is Down!");
 						if (ServerProxy.this.receiveService.isAlive()) {
@@ -511,7 +513,11 @@ public class UniverseImpl extends UnicastRemoteObject implements Universe,
 				while (true) {
 					Task task = null;
 					try {
-						task = universe.getTask();
+						task = universe.getReadyTask();
+						task.setTaskID(task.getTaskID() + ":" + ID);
+						if(Config.DEBUG) {
+							System.out.println("Universe: Task ID is " + task.getTaskID());
+						}
 						synchronized (runningTaskMap) {
 							space.addTask(task);
 							runningTaskMap.put(task.getTaskID(), task);
@@ -519,7 +525,7 @@ public class UniverseImpl extends UnicastRemoteObject implements Universe,
 					} catch (RemoteException e) {
 						System.out.println("Send Service: Space " + ID
 								+ " is Down!");
-						universe.addTask(task);
+						universe.addReadyTask(task);
 						return;
 						// If the Space is down abnormal, Save all tasks.
 					}
@@ -528,16 +534,6 @@ public class UniverseImpl extends UnicastRemoteObject implements Universe,
 		}
 	}
 
-	public void addReadyTask(Task task) {
-		try {
-			readyTaskQueue.put(task);
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		}
-	}
 
-	public void addSuccessorTask(Task task) {
-		successorTaskMap.put(task.getTaskID(), task);
-	}
 
 }

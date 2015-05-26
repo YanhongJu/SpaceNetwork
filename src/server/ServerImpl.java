@@ -196,7 +196,7 @@ public class ServerImpl extends UnicastRemoteObject implements Server {
 	public void register(final ClientImpl<?> client) throws RemoteException {
 		final ClientProxy clientProxy = new ClientProxy(client,
 				ClientID.getAndIncrement());
-		client.setID(clientProxy.ID);
+		client.setID(234);
 		clientProxies.put(clientProxy.ID, clientProxy);
 		clientProxy.start();
 		Logger.getLogger(this.getClass().getName()).log(Level.INFO,
@@ -270,6 +270,13 @@ public class ServerImpl extends UnicastRemoteObject implements Server {
 			resultQueue = new LinkedBlockingQueue<Result>();
 			sendService = new SendService();
 			receiveService = new ReceiveService();
+			if(Config.DEBUG) {
+				try {
+					System.out.println("Server: client is " + client.getID());
+				} catch (RemoteException e) {
+					e.printStackTrace();
+				}
+			}
 		}
 
 		/**
@@ -324,7 +331,13 @@ public class ServerImpl extends UnicastRemoteObject implements Server {
 					+ server.makeTaskID());
 			task.setTargetTaskID(server.ID + ":" + this.ID + ":"
 					+ server.makeTaskID() + ":" + "-1");
+			if(Config.DEBUG) {
+				System.out.println("Server: Task ID generated:" + task.getTaskID());
+			}
 			server.addTask(task);
+			if(Config.DEBUG) {
+				System.out.println("Server: Task is added.");
+			}
 			return task.getTaskID();
 		}
 
@@ -363,12 +376,13 @@ public class ServerImpl extends UnicastRemoteObject implements Server {
 			@Override
 			public void run() {
 				while (true) {
-					Task task = null;
-					String submittedtaskID = null;
 					try {
-						task = client.getTask();
-						submittedtaskID = submitTask(task);
+						Task task = client.getTask();
+						String submittedtaskID = submitTask(task);
 						client.addTaskID(submittedtaskID);
+						if(Config.DEBUG) {
+							System.out.println(submittedtaskID);
+						}
 						// client.addTaskID(submitTask(client.getTask()));
 					} catch (RemoteException e) {
 						e.printStackTrace();

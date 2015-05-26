@@ -8,7 +8,6 @@ import api.Task;
 import config.Config;
 import space.SpaceImpl;
 import task.SuccessorTask;
-import universe.Universe;
 import universe.UniverseImpl;
 
 /**
@@ -121,12 +120,10 @@ public class ValueResult<ValueType> extends Result {
 	 */
 	@SuppressWarnings("unchecked")
 	@Override
-	public boolean process(SpaceImpl space, Map<String, Task> runningTaskMap,
+	public void process(SpaceImpl space, Map<String, Task> runningTaskMap,
 			BlockingQueue<Result> intermediateResultQueue) {
 
-		// Get the result's target successor task. If the task is unavailabe at
-		// the moment, put the result into Temporary Result Queue in Computer
-		// Proxy.
+		// Get the result's target successor task.
 		SuccessorTask<ValueType> successortask = (SuccessorTask<ValueType>) space
 				.getSuccessorTask(TargetTaskId);
 
@@ -148,7 +145,6 @@ public class ValueResult<ValueType> extends Result {
 				space.successorToReady(successortask);
 			}
 		}
-		return true;
 	}
 
 	/**
@@ -167,12 +163,12 @@ public class ValueResult<ValueType> extends Result {
 	 */
 	@SuppressWarnings("unchecked")
 	@Override
-	public boolean process(final UniverseImpl universe,
+	public void process(final UniverseImpl universe,
 			final Map<String, Task> runningTaskMap) {
-
-		if(isFinal()) {
+		// If the result is final, dispatch it.
+		if (isFinal()) {
 			universe.dispatchResult(this);
-			return true;
+			return;
 		}
 		// Get the result's target successor task. If the task is unavailabe at
 		// the moment, put the result into Temporary Result Queue in Computer
@@ -186,8 +182,6 @@ public class ValueResult<ValueType> extends Result {
 		// The successor task is moved from Successor Task Queue to
 		// Ready Task Queue.
 		universe.successorToReady(successortask);
-
-		return true;
 	}
 
 }
