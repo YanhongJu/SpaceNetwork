@@ -1,10 +1,5 @@
 package universe;
 
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.io.Serializable;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.server.UnicastRemoteObject;
@@ -20,12 +15,10 @@ import java.util.logging.Logger;
 import config.Config;
 import server.Server;
 import space.Space;
-import space.SpaceImpl;
-import space.SpaceImpl.ComputerProxy;
 import api.Result;
 import api.Task;
 
-public class UniverseImpl extends UnicastRemoteObject implements Universe, Serializable  {
+public class UniverseImpl extends UnicastRemoteObject implements Universe {
 	private static final long serialVersionUID = -5110211125190845128L;
 	private static UniverseImpl universe;
 	private static String recoveryFileName = "recovery.bk";
@@ -84,33 +77,6 @@ public class UniverseImpl extends UnicastRemoteObject implements Universe, Seria
 	 * @throws RemoteException
 	 */
 	public UniverseImpl(String recoveryFileName) throws RemoteException {
-		
-		System.out.println(" reading from file");
-		try {
-			
-			FileInputStream streamIn = new FileInputStream(recoveryFileName);
-            ObjectInputStream objectinputstream = new ObjectInputStream(streamIn);
-            UniverseImpl readUniverse = (UniverseImpl) objectinputstream.readObject();
-            
-            
-            readyTaskQueue = readUniverse.readyTaskQueue;
-    		successorTaskMap = readUniverse.successorTaskMap;
-    		serverProxies = readUniverse.serverProxies;
-    		for(int i : serverProxies.keySet())
-    			serverProxies.get(i).start();
-    		spaceProxies = readUniverse.spaceProxies;
-    		for(int i : spaceProxies.keySet())
-    			spaceProxies.get(i).start();
-    		Logger.getLogger(this.getClass().getName()).log(Level.INFO,
-    				"Universe recovered.");   
-            
-
-        } catch (Exception e) {
-
-            e.printStackTrace();
-        }			
-		
-		
 		readyTaskQueue = new LinkedBlockingQueue<>();
 		successorTaskMap = Collections.synchronizedMap(new HashMap<>());
 		serverProxies = Collections.synchronizedMap(new HashMap<>());
@@ -124,29 +90,16 @@ public class UniverseImpl extends UnicastRemoteObject implements Universe, Seria
 		universe = args.length == 0 ? new UniverseImpl() : new UniverseImpl(
 				recoveryFileName);
 		LocateRegistry.createRegistry(Universe.PORT).rebind(
-				Universe.SERVICE_NAME, universe);		
-		
-		while(true){
-			Thread.sleep(10000);
-			universe.saveToFile();
-		}
+				Universe.SERVICE_NAME, universe);
 
 		// Main thread waiting for Key Enter to terminate.
-		
-	}
+		try {
+			System.in.read();
+		} catch (Throwable ignored) {
 
-	private void saveToFile() {
-		try{			 
-			FileOutputStream fout = new FileOutputStream(recoveryFileName);
-			ObjectOutputStream oos = new ObjectOutputStream(fout);   
-			oos.writeObject(this);
-			oos.close();
-			System.out.println("finish writing");
-	 
-		   }catch(Exception ex){
-			   ex.printStackTrace();
-		   }
-		
+		}
+		System.out.println("Universe stopped.\n");
+		System.exit(-1);
 	}
 
 	/**

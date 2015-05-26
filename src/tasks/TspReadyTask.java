@@ -148,6 +148,8 @@ public class TspReadyTask extends ReadyTask<TspData> {
 			TspSuccessorTask successorTask = new TspSuccessorTask(arg, argNum,
 					this.getTargetSuccessorTaskId(),
 					this.getTargetSuccessorTaskArgIndex());
+			successorTask.setLayer(getLayer());
+			
 			successorTask.setSpaceRunnable(true);
 			subtasks.add(successorTask);
 
@@ -167,6 +169,7 @@ public class TspReadyTask extends ReadyTask<TspData> {
 
 				TspReadyTask child = new TspReadyTask(arg, i, numOfCities,
 						distance);
+				child.setLayer(getLayer()+1);
 
 				if (i < numOfRunningTasks)
 					runningtasks.add(child);

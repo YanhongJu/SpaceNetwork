@@ -75,15 +75,18 @@ public class FibonacciReadyTask extends ReadyTask<Integer> {
 					this.getTargetSuccessorTaskArgIndex(), taskStartTime,
 					taskEndTime);
 		} else {
-			// If the number is not less than 2, geenerate Task Result.
+			// If the number is not less than 2, generate Task Result.
 			Integer n = ((ArrayList<Integer>) getArg()).get(0);
 
 			// Generate first child ready task. And make it as a running task.
 			List<Integer> arg = new ArrayList<Integer>();
 			arg.add(n - 1);
 			int argIndex = 0;
+			
 			FibonacciReadyTask runningtask = new FibonacciReadyTask(arg,
 					argIndex);
+			runningtask.setLayer(getLayer()+1);
+			
 			List<Task> runningtasks = new ArrayList<Task>();
 			runningtasks.add(runningtask);
 
@@ -91,7 +94,9 @@ public class FibonacciReadyTask extends ReadyTask<Integer> {
 			arg = new ArrayList<Integer>();
 			arg.add(n - 2);
 			argIndex = 1;
+			
 			FibonacciReadyTask subtask = new FibonacciReadyTask(arg, argIndex);
+			subtask.setLayer(getLayer()+1);
 
 			// Generate successor task.
 			arg = new ArrayList<Integer>();
@@ -101,6 +106,9 @@ public class FibonacciReadyTask extends ReadyTask<Integer> {
 			FibonacciSuccessorTask successorTask = new FibonacciSuccessorTask(
 					arg, argNum, this.getTargetSuccessorTaskId(),
 					this.getTargetSuccessorTaskArgIndex());
+			
+			successorTask.setLayer(getLayer());
+			
 			successorTask.setSpaceRunnable(true);
 			List<Task> subtasks = new ArrayList<Task>();
 			subtasks.add(successorTask);

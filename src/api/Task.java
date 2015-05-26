@@ -24,7 +24,8 @@ public abstract class Task implements Serializable {
 	 */
 	private boolean isSpaceRunnable;
 	
-	
+	private int layer = 0;
+
 	/**
 	 * Constructor of Task.
 	 * 
@@ -116,5 +117,20 @@ public abstract class Task implements Serializable {
 	 */
 	public void setTargetTaskID(String targetTaskId) {
 		this.targetTaskID = targetTaskId;
+	}
+
+	public int getLayer() {
+		return layer;
+	}
+
+	public void setLayer(int layer) {
+		this.layer = layer;
+	}
+	
+	public boolean isCoarse() {
+		if (layer <= 3)
+			return true;
+		else
+			return false;
 	}
 }
