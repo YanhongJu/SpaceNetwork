@@ -19,20 +19,20 @@ import config.Config;
 /**
  * Implementation of Computer, generating Task Proxies to execute the tasks in
  * its Ready Task Queue and put the results into Result Queue. The Computer
- * assigns each task with an task Id.
+ * assigns each task with an task ID.
  *
  */
 public class ComputerImpl extends UnicastRemoteObject implements Computer {
-	private static final long serialVersionUID = -3289346323918715850L;
+	private final static long serialVersionUID = -3289346323918715850L;
 	/**
-	 * Computer Id.
+	 * Computer ID.
 	 */
-	private int ComputeId;
+	private int ID;
 
 	/**
-	 * Task Id.
+	 * Task ID.
 	 */
-	private static final AtomicInteger taskIds = new AtomicInteger();
+	private final static AtomicInteger taskID = new AtomicInteger();
 
 	/**
 	 * Ready Task Queue.
@@ -52,8 +52,11 @@ public class ComputerImpl extends UnicastRemoteObject implements Computer {
 	/**
 	 * Task Proxy Threads.
 	 */
-	private final TaskProxy[] taskProxies;
-
+	private final Worker[] workers;
+	
+	/**
+	 * Space
+	 */
 	private static Space space;
 
 	/**
@@ -65,7 +68,7 @@ public class ComputerImpl extends UnicastRemoteObject implements Computer {
 	public ComputerImpl() throws RemoteException {
 		resultQueue = new LinkedBlockingQueue<>();
 		if (Config.AmeliorationFlag) {
-			readyTaskQueue = new LinkedBlockingQueue<>();
+			readyTaskQueue = new LinkedBlockingQueue<>(32);
 		} else {
 			readyTaskQueue = new LinkedBlockingQueue<>(1);
 		}
@@ -75,10 +78,10 @@ public class ComputerImpl extends UnicastRemoteObject implements Computer {
 		} else {
 			ProcessNum = 1;
 		}
-		taskProxies = new TaskProxy[ProcessNum];
+		workers = new Worker[ProcessNum];
 		for (int i = 0; i < ProcessNum; i++) {
-			taskProxies[i] = new TaskProxy();
-			taskProxies[i].start();
+			workers[i] = new Worker();
+			workers[i].start();
 		}
 		Logger.getLogger(ComputerImpl.class.getName()).log(Level.INFO,
 				"Computer: started with " + ProcessNum + " threads.");
@@ -99,33 +102,33 @@ public class ComputerImpl extends UnicastRemoteObject implements Computer {
 
 		}
 		Logger.getLogger(ComputerImpl.class.getName()).log(Level.INFO,
-				"Computer: " + computer.ComputeId + " exited.");
+				"Computer: " + computer.ID + " exited.");
 		System.exit(-1);
 	}
 
 	/**
 	 * Set an ID to the computer. Call from Space.
 	 * 
-	 * @param computerId
-	 *            Computer Id.
+	 * @param computerID
+	 *            Computer ID.
 	 * @throws RemoteException
 	 *             Failed to connect computer.
 	 */
 	@Override
-	public void setID(int computerId) throws RemoteException {
-		this.ComputeId = computerId;
+	public void setID(int computerID) throws RemoteException {
+		this.ID = computerID;
 	}
 
 	/**
 	 * Get Computer ID. Call from Space.
 	 * 
-	 * @return Computer Id.
+	 * @return Computer ID.
 	 * @throws RemoteException
 	 *             Failed to connect to computer.
 	 */
 	@Override
 	public int getID() throws RemoteException {
-		return this.ComputeId;
+		return this.ID;
 	}
 
 	/**
@@ -174,7 +177,7 @@ public class ComputerImpl extends UnicastRemoteObject implements Computer {
 
 	/**
 	 * Execute the task and generate the result. Assign every subtask with an
-	 * task Id.
+	 * task ID.
 	 */
 	@Override
 	public Result execute(Task task) {
@@ -184,33 +187,33 @@ public class ComputerImpl extends UnicastRemoteObject implements Computer {
 		if (result.getResultType() == Result.VALUERESULT) {
 			return result;
 		} else {
-			// If the result is Task Result, assgin subtasks with Task Id.
+			// If the result is Task Result, assgin subtasks with Task ID.
 			List<Task> subtasks = ((TaskResult) result).getSubTasks();
-			// Assign Successor Task with an Task Id
+			// Assign Successor Task with an Task ID
 			Task successor = subtasks.get(0);
-			String successorTaskId = ComputeId + ":"
+			String successorTaskID = ID + ":"
 					+ Thread.currentThread().getId() + ":"
-					+ taskIds.getAndIncrement();
-			successor.setTaskID(successorTaskId);
-			// Assign other Ready Task with Task ids
+					+ taskID.getAndIncrement();
+			successor.setTaskID(successorTaskID);
+			// Assign other Ready Task with Task IDs
 			for (int i = 1; i < subtasks.size(); i++) {
-				String taskId = ComputeId + ":"
+				String taskid = ID + ":"
 						+ Thread.currentThread().getId() + ":"
-						+ taskIds.getAndIncrement();
+						+ taskID.getAndIncrement();
 				Task subtask = subtasks.get(i);
-				subtask.setTaskID(taskId);
-				subtask.setTargetTaskID(successorTaskId);
+				subtask.setTaskID(taskid);
+				subtask.setTargetTaskID(successorTaskID);
 			}
-			// Assign running tasks with Task Ids and put them into Computer
+			// Assign running tasks with Task IDs and put them into Computer
 			// Ready Task Queue
 			List<Task> runningtasks = ((TaskResult) result).getRunningTask();
 			for (int i = 0; i < runningtasks.size(); i++) {
-				String taskId = ComputeId + ":"
+				String taskid = ID + ":"
 						+ Thread.currentThread().getId() + ":"
-						+ taskIds.getAndIncrement();
+						+ taskID.getAndIncrement();
 				Task runningtask = runningtasks.get(i);
-				runningtask.setTaskID(taskId);
-				runningtask.setTargetTaskID(successorTaskId);
+				runningtask.setTaskID(taskid);
+				runningtask.setTargetTaskID(successorTaskID);
 			}
 		}
 		return result;
@@ -235,11 +238,11 @@ public class ComputerImpl extends UnicastRemoteObject implements Computer {
 
 	/**
 	 * 
-	 * A Task Proxy is a thread to get tasks from Computer Ready Queue and
+	 * A Worker is a thread to get tasks from Computer Ready Queue and
 	 * execute them, put the results into Computer Result Task Queue.
 	 *
 	 */
-	private class TaskProxy extends Thread {
+	private class Worker extends Thread {
 		@Override
 		public void run() {
 			while (true) {

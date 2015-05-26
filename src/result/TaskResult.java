@@ -8,6 +8,7 @@ import config.Config;
 import api.Result;
 import api.Task;
 import space.SpaceImpl;
+import universe.UniverseImpl;
 
 /**
  * 
@@ -16,7 +17,15 @@ import space.SpaceImpl;
  */
 public class TaskResult extends Result {
 	private static final long serialVersionUID = -1385375075612513989L;
+
+	/**
+	 * Subtasks.
+	 */
 	private List<Task> subTasks;
+
+	/**
+	 * Running Tasks.
+	 */
 	private List<Task> runningTasks;
 
 	/**
@@ -24,6 +33,8 @@ public class TaskResult extends Result {
 	 * 
 	 * @param resultId
 	 *            Result Id, same as its associated task Id.
+	 * @param layer
+	 *            layer
 	 * @param subTasks
 	 *            Subtasks to be stored in Space. First task is a successor task
 	 *            to be stored in Successor Task Queue, following by child ready
@@ -74,17 +85,16 @@ public class TaskResult extends Result {
 	 * @param TempResultQueue
 	 *            Temporary Result Queue in which the result can be stored if
 	 *            result processing failed.
-	 * 
 	 */
 	@Override
 	public boolean process(final SpaceImpl space,
-			final Map<String, Task> ComputerProxyRunningTaskMap,
-			final BlockingQueue<Result> TempResultQueue) {
+			final Map<String, Task> RunningTaskMap,
+			final BlockingQueue<Result> intermediateResultQueue) {
 		if (Config.AmeliorationFlag) {
 			// Store the running tasks in the Computer Proxy Running Task Map.
 			for (int i = 0; i < runningTasks.size(); i++) {
-				ComputerProxyRunningTaskMap.put(
-						runningTasks.get(i).getTaskID(), runningTasks.get(i));
+				RunningTaskMap.put(runningTasks.get(i).getTaskID(),
+						runningTasks.get(i));
 			}
 
 			// First task in subtasks is a successor. Put it into Space's
@@ -104,6 +114,19 @@ public class TaskResult extends Result {
 			for (int i = 1; i < subTasks.size(); i++) {
 				space.addReadyTask(subTasks.get(i));
 			}
+		}
+		return true;
+	}
+
+	@Override
+	public boolean process(UniverseImpl universe,
+			Map<String, Task> runningTaskMap) {
+		for (int i = 0; i < runningTasks.size(); i++) {
+			universe.addReadyTask(runningTasks.get(i));
+		}
+		universe.addSuccessorTask(subTasks.get(0));
+		for (int i = 1; i < subTasks.size(); i++) {
+			universe.addReadyTask(subTasks.get(i));
 		}
 		return true;
 	}

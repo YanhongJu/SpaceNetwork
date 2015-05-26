@@ -16,10 +16,12 @@ import api.Task;
  */
 abstract public class ReadyTask<T> extends Task {
 	private static final long serialVersionUID = -998071752240333400L;
+	
 	/**
 	 * Target Successor Task's Argument Index.
 	 */
 	private int targetSuccessorTaskArgIndex;
+	
 	/**
 	 * Argument list.
 	 */

@@ -1,7 +1,9 @@
 package universe;
 
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
@@ -20,12 +22,13 @@ import java.util.logging.Logger;
 import config.Config;
 import server.Server;
 import space.Space;
-import space.SpaceImpl;
-import space.SpaceImpl.ComputerProxy;
 import api.Result;
 import api.Task;
+import space.SpaceImpl;
+import task.SuccessorTask;
 
-public class UniverseImpl extends UnicastRemoteObject implements Universe, Serializable  {
+public class UniverseImpl extends UnicastRemoteObject implements Universe,
+		Serializable {
 	private static final long serialVersionUID = -5110211125190845128L;
 	private static UniverseImpl universe;
 	private static String recoveryFileName = "recovery.bk";
@@ -84,39 +87,39 @@ public class UniverseImpl extends UnicastRemoteObject implements Universe, Seria
 	 * @throws RemoteException
 	 */
 	public UniverseImpl(String recoveryFileName) throws RemoteException {
-		
 		System.out.println(" reading from file");
+		UniverseImpl readUniverse = null;
+		ObjectInputStream objectinputstream = null;
 		try {
-			
-			FileInputStream streamIn = new FileInputStream(recoveryFileName);
-            ObjectInputStream objectinputstream = new ObjectInputStream(streamIn);
-            UniverseImpl readUniverse = (UniverseImpl) objectinputstream.readObject();
-            
-            
-            readyTaskQueue = readUniverse.readyTaskQueue;
-    		successorTaskMap = readUniverse.successorTaskMap;
-    		serverProxies = readUniverse.serverProxies;
-    		for(int i : serverProxies.keySet())
-    			serverProxies.get(i).start();
-    		spaceProxies = readUniverse.spaceProxies;
-    		for(int i : spaceProxies.keySet())
-    			spaceProxies.get(i).start();
-    		Logger.getLogger(this.getClass().getName()).log(Level.INFO,
-    				"Universe recovered.");   
-            
-
-        } catch (Exception e) {
-
-            e.printStackTrace();
-        }			
-		
-		
-		readyTaskQueue = new LinkedBlockingQueue<>();
-		successorTaskMap = Collections.synchronizedMap(new HashMap<>());
-		serverProxies = Collections.synchronizedMap(new HashMap<>());
-		spaceProxies = Collections.synchronizedMap(new HashMap<>());
+			objectinputstream = new ObjectInputStream(new FileInputStream(
+					recoveryFileName));
+			readUniverse = (UniverseImpl) objectinputstream.readObject();
+		} catch (Exception e) {
+			readyTaskQueue = new LinkedBlockingQueue<>();
+			successorTaskMap = Collections.synchronizedMap(new HashMap<>());
+			serverProxies = Collections.synchronizedMap(new HashMap<>());
+			spaceProxies = Collections.synchronizedMap(new HashMap<>());
+			Logger.getLogger(this.getClass().getName()).log(Level.INFO,
+					"Universe started.");
+			return;
+		}
+		readyTaskQueue = readUniverse.readyTaskQueue;
+		successorTaskMap = readUniverse.successorTaskMap;
+		serverProxies = readUniverse.serverProxies;
+		for (int i : serverProxies.keySet()) {
+			serverProxies.get(i).start();
+		}
+		spaceProxies = readUniverse.spaceProxies;
+		for (int i : spaceProxies.keySet()) {
+			spaceProxies.get(i).start();
+		}
+		try {
+			objectinputstream.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 		Logger.getLogger(this.getClass().getName()).log(Level.INFO,
-				"Universe started.");
+				"Universe recovered.");
 	}
 
 	public static void main(final String[] args) throws Exception {
@@ -124,29 +127,27 @@ public class UniverseImpl extends UnicastRemoteObject implements Universe, Seria
 		universe = args.length == 0 ? new UniverseImpl() : new UniverseImpl(
 				recoveryFileName);
 		LocateRegistry.createRegistry(Universe.PORT).rebind(
-				Universe.SERVICE_NAME, universe);		
-		
-		while(true){
+				Universe.SERVICE_NAME, universe);
+
+		while (true) {
 			Thread.sleep(10000);
 			universe.saveToFile();
 		}
 
 		// Main thread waiting for Key Enter to terminate.
-		
+
 	}
 
 	private void saveToFile() {
-		try{			 
+		try {
 			FileOutputStream fout = new FileOutputStream(recoveryFileName);
-			ObjectOutputStream oos = new ObjectOutputStream(fout);   
+			ObjectOutputStream oos = new ObjectOutputStream(fout);
 			oos.writeObject(this);
 			oos.close();
 			System.out.println("finish writing");
-	 
-		   }catch(Exception ex){
-			   ex.printStackTrace();
-		   }
-		
+		} catch (Exception ex) {
+			ex.printStackTrace();
+		}
 	}
 
 	/**
@@ -181,6 +182,17 @@ public class UniverseImpl extends UnicastRemoteObject implements Universe, Seria
 	}
 
 	/**
+	 * Get a task from the Successor Task Map with Task Id.
+	 * 
+	 * @param TaskId
+	 *            Task Id.
+	 * @return A Successor Task.
+	 */
+	public Task getSuccessorTask(String TaskId) {
+		return successorTaskMap.get(TaskId);
+	}
+
+	/**
 	 * 
 	 * Remove a successor task from Successor Task Map and put it into Ready
 	 * Task Queue, when this successor task has all needed arguments and ready
@@ -189,7 +201,7 @@ public class UniverseImpl extends UnicastRemoteObject implements Universe, Seria
 	 * @param successortask
 	 *            The ready-to-run successor task.
 	 */
-	private void successorToReady(Task successortask) {
+	public void successorToReady(Task successortask) {
 		successorTaskMap.remove(successortask.getTaskID());
 		try {
 			readyTaskQueue.put(successortask);
@@ -205,7 +217,7 @@ public class UniverseImpl extends UnicastRemoteObject implements Universe, Seria
 	 * @param result
 	 *            Result to be dispatched.
 	 */
-	private void dispatchResult(final Result result) {
+	public void dispatchResult(final Result result) {
 		String resultID[] = result.getResultId().split(":");
 		int serverID = Integer.parseInt(resultID[0]);
 		synchronized (serverProxies) {
@@ -381,7 +393,7 @@ public class UniverseImpl extends UnicastRemoteObject implements Universe, Seria
 						server.dispatchResult(result);
 					} catch (RemoteException e) {
 						e.printStackTrace();
-						System.out.println("ReceiveService: Server " + ID
+						System.out.println("Receive Service: Server " + ID
 								+ " is Down!");
 						return;
 						// If the Server is down abnormally, should Clean the
@@ -403,10 +415,10 @@ public class UniverseImpl extends UnicastRemoteObject implements Universe, Seria
 					Task task = null;
 					try {
 						task = server.getTask();
-						UniverseImpl.this.addTask(task);
+						universe.addTask(task);
 					} catch (RemoteException e) {
 						e.printStackTrace();
-						System.out.println("SendService: Server " + ID
+						System.out.println("Send Service: Server " + ID
 								+ " is Down!");
 						if (ServerProxy.this.receiveService.isAlive()) {
 							ServerProxy.this.receiveService.interrupt();
@@ -470,12 +482,12 @@ public class UniverseImpl extends UnicastRemoteObject implements Universe, Seria
 					Result result = null;
 					try {
 						result = space.getResult();
+						// Check if it is the final result or not.
 						synchronized (runningTaskMap) {
-							runningTaskMap.remove(result.getResultId());
-							UniverseImpl.this.dispatchResult(result);
+							result.process(universe, runningTaskMap);
 						}
 					} catch (RemoteException e) {
-						System.out.println("Receive Servcie Space " + ID
+						System.out.println("Receive Servcie: Space " + ID
 								+ " is Down!");
 						if (SpaceProxy.this.sendService.isAlive()) {
 							SpaceProxy.this.sendService.interrupt();
@@ -499,21 +511,33 @@ public class UniverseImpl extends UnicastRemoteObject implements Universe, Seria
 				while (true) {
 					Task task = null;
 					try {
-						task = UniverseImpl.this.getTask();
+						task = universe.getTask();
 						synchronized (runningTaskMap) {
 							space.addTask(task);
 							runningTaskMap.put(task.getTaskID(), task);
 						}
 					} catch (RemoteException e) {
-						System.out.println("Send Service Space " + ID
+						System.out.println("Send Service: Space " + ID
 								+ " is Down!");
-						UniverseImpl.this.addTask(task);
+						universe.addTask(task);
 						return;
 						// If the Space is down abnormal, Save all tasks.
 					}
 				}
 			}
 		}
+	}
+
+	public void addReadyTask(Task task) {
+		try {
+			readyTaskQueue.put(task);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+	}
+
+	public void addSuccessorTask(Task task) {
+		successorTaskMap.put(task.getTaskID(), task);
 	}
 
 }

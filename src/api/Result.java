@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 
 import space.SpaceImpl;
+import universe.UniverseImpl;
 
 /**
  * Result is for containing result of a task execution, including the result Id,
@@ -14,6 +15,7 @@ import space.SpaceImpl;
  */
 public abstract class Result implements Serializable {
 	private static final long serialVersionUID = 3823660517030582914L;
+
 	/**
 	 * Value Result Type Identifier.
 	 */
@@ -28,6 +30,11 @@ public abstract class Result implements Serializable {
 	 * Result ID, same as its associated task ID.
 	 */
 	private String ResultId;
+
+	/**
+	 * Coarse flag.
+	 */
+	private boolean coarse;
 
 	/**
 	 * Task start time.
@@ -118,22 +125,12 @@ public abstract class Result implements Serializable {
 	}
 
 	/**
-	 * Set the result ID, same as its assoicated Task Id.
-	 * 
-	 * @param resultId
-	 *            the resultId to set
-	 */
-	public void setResultId(String resultId) {
-		ResultId = resultId;
-	}
-
-	/**
 	 * Get the result type.
 	 * 
 	 * @return the resultType 0 if it is Value Result. 1 If it is Task Result.
 	 */
 	public int getResultType() {
-		return ResultType;
+		return this.ResultType;
 	}
 
 	/**
@@ -143,7 +140,7 @@ public abstract class Result implements Serializable {
 	 *            the resultType to set
 	 */
 	public void setResultType(int resultType) {
-		ResultType = resultType;
+		this.ResultType = resultType;
 	}
 
 	/**
@@ -155,15 +152,48 @@ public abstract class Result implements Serializable {
 	 * @param ComputerProxyRunningTaskMap
 	 *            The Running Task Map in the Computer Proxy, where the
 	 *            associated task is stored.
-	 * @param TempResultQueue
+	 * @param resultQueue
 	 *            Temporary Result Queue in which the result can be stored if
 	 *            result processing failed.
 	 * @return The status of processing. True if processed successfully, false
 	 *         otherwise.
 	 */
 	public abstract boolean process(final SpaceImpl space,
-			final Map<String, Task> ComputerProxyRunningTaskMap,
-			final BlockingQueue<Result> TempResultQueue);
+			final Map<String, Task> runningTaskMap,
+			final BlockingQueue<Result> resultQueue);
+
+	/**
+	 * Process the Result. Call from Universe.
+	 * 
+	 * @param universe
+	 *            Universe
+	 * @param runningTaskMap
+	 *            The running Task Map in the Space Proxy.
+	 * @return The status of processing. True if processed successfully, false
+	 *         otherwise.
+	 */
+	public abstract boolean process(final UniverseImpl universe,
+			final Map<String, Task> runningTaskMap);
+
+	/**
+	 * Check if the Result is coarse or not.
+	 * 
+	 * @return True is the Result is coarse. False otherwise.
+	 */
+	public boolean isCoarse() {
+		return this.coarse;
+	}
+
+	/**
+	 * Set if the Result is coarse or not.
+	 * 
+	 * @param coarse
+	 *            True if the Result is coarse. False otherwise.
+	 * 
+	 */
+	public void setCoarse(boolean coarse) {
+		this.coarse = coarse;
+	}
 
 	/**
 	 * Output format of Result runtime.

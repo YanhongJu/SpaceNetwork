@@ -8,6 +8,8 @@ import api.Task;
 import config.Config;
 import space.SpaceImpl;
 import task.SuccessorTask;
+import universe.Universe;
+import universe.UniverseImpl;
 
 /**
  * 
@@ -39,6 +41,8 @@ public class ValueResult<ValueType> extends Result {
 	 * 
 	 * @param resultId
 	 *            Result Id, same as its associated task Id.
+	 * @param layer
+	 *            layer
 	 * @param value
 	 *            Result value.
 	 * @param TargetTaskId
@@ -87,6 +91,21 @@ public class ValueResult<ValueType> extends Result {
 	}
 
 	/**
+	 * Check if the value result is the final result. If yes, put the result
+	 * into Space's Result Queue.
+	 * 
+	 * @return True if it is the final result. False otherwise.
+	 */
+	public boolean isFinal() {
+		String taskID[] = TargetTaskId.split(":");
+		if (taskID[taskID.length - 1].equals("-1")) {
+			return true;
+		} else {
+			return false;
+		}
+	}
+
+	/**
 	 * Process the result. Call from Space.
 	 * 
 	 * @param space
@@ -102,35 +121,14 @@ public class ValueResult<ValueType> extends Result {
 	 */
 	@SuppressWarnings("unchecked")
 	@Override
-	public boolean process(SpaceImpl space,
-			Map<String, Task> ComputerProxyRunningTaskMap,
-			BlockingQueue<Result> TempResultQueue) {
-
-		// Check if the value result is the final result. If yes, put the result
-		// into Space's Result Queue.
-		String taskID[] = TargetTaskId.split(":");
-		if (taskID[taskID.length-1].equals("-1")) {
-			space.addResult(this);
-			return true;
-		}
+	public boolean process(SpaceImpl space, Map<String, Task> runningTaskMap,
+			BlockingQueue<Result> intermediateResultQueue) {
 
 		// Get the result's target successor task. If the task is unavailabe at
 		// the moment, put the result into Temporary Result Queue in Computer
 		// Proxy.
 		SuccessorTask<ValueType> successortask = (SuccessorTask<ValueType>) space
 				.getSuccessorTask(TargetTaskId);
-		if (successortask == null) {
-			try {
-				TempResultQueue.put(this);
-				if (Config.STATUSOUTPUT) {
-					System.out.println("Successor task " + TargetTaskId
-							+ " is missing!");
-				}
-				return false;
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-			}
-		}
 
 		// Set the argument in the target successor task at the target index.
 		successortask.setArgAt(TargetArgIndex, this.value);
@@ -139,16 +137,56 @@ public class ValueResult<ValueType> extends Result {
 		// run.
 		if (successortask.isRunnable()) {
 			// Check if the successor task can be run in Space.
-			if (Config.SpaceExecutTaskFlag && successortask.isSpaceRunnable()) {
+			if (Config.SpaceExecutTaskFlag && successortask.isSpaceRunnable()
+					&& (Math.random() < 0.5)) {
 				// Space execute this successor task and store the result into
 				// Computer Proxy Temporary Result Queue.
-				space.spaceExecuteTask(successortask, TempResultQueue);
+				space.spaceExecuteTask(successortask, intermediateResultQueue);
 			} else {
 				// The successor task is moved from Successor Task Queue to
 				// Ready Task Queue.
 				space.successorToReady(successortask);
 			}
 		}
+		return true;
+	}
+
+	/**
+	 * Process the result. Call from Space.
+	 * 
+	 * @param space
+	 *            The Space implemetation in which the result is to be
+	 *            processed.
+	 * @param ComputerProxyRunningTaskMap
+	 *            The Running Task Map in the Computer Proxy, where the
+	 *            associated task is stored.
+	 * @param TempResultQueue
+	 *            Temporary Result Queue in which the result can be stored if
+	 *            result processing failed.
+	 * 
+	 */
+	@SuppressWarnings("unchecked")
+	@Override
+	public boolean process(final UniverseImpl universe,
+			final Map<String, Task> runningTaskMap) {
+
+		if(isFinal()) {
+			universe.dispatchResult(this);
+			return true;
+		}
+		// Get the result's target successor task. If the task is unavailabe at
+		// the moment, put the result into Temporary Result Queue in Computer
+		// Proxy.
+		SuccessorTask<ValueType> successortask = (SuccessorTask<ValueType>) universe
+				.getSuccessorTask(TargetTaskId);
+
+		// Set the argument in the target successor task at the target index.
+		successortask.setArgAt(TargetArgIndex, this.value);
+
+		// The successor task is moved from Successor Task Queue to
+		// Ready Task Queue.
+		universe.successorToReady(successortask);
+
 		return true;
 	}
 

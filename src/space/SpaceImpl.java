@@ -40,7 +40,7 @@ public class SpaceImpl extends UnicastRemoteObject implements Space {
 	 * Space ID.
 	 */
 	private static int ID;
-	
+
 	/**
 	 * Computer Id.
 	 */
@@ -62,7 +62,7 @@ public class SpaceImpl extends UnicastRemoteObject implements Space {
 	private final BlockingQueue<Result> resultQueue;
 
 	/**
-	 * Computer Proxies Map. 
+	 * Computer Proxies Map.
 	 */
 	private final Map<Integer, ComputerProxy> computerProxies;
 
@@ -72,7 +72,9 @@ public class SpaceImpl extends UnicastRemoteObject implements Space {
 	 * @throws RemoteException
 	 *             Cannot connect to Space.
 	 * @throws NotBoundException
+	 *             Bad Universe Domain Name
 	 * @throws MalformedURLException
+	 *             Bad Universe Domain Name
 	 */
 	public SpaceImpl(String universeDomainName) throws RemoteException,
 			MalformedURLException, NotBoundException {
@@ -123,7 +125,7 @@ public class SpaceImpl extends UnicastRemoteObject implements Space {
 		System.out.println("Space stopped.\n");
 		System.exit(-1);
 	}
-	
+
 	/**
 	 * Set an ID to the Space. Call from Universe.
 	 * 
@@ -136,7 +138,7 @@ public class SpaceImpl extends UnicastRemoteObject implements Space {
 	public void setID(int spaceID) throws RemoteException {
 		ID = spaceID;
 	}
-	
+
 	/**
 	 * Add a Task to the Ready Task Queue. Call from Space Proxy in Universe.
 	 * 
@@ -166,6 +168,20 @@ public class SpaceImpl extends UnicastRemoteObject implements Space {
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
+	}
+
+	/**
+	 * Get a Task from Ready Task Queue.
+	 * 
+	 * @return Task.
+	 */
+	public Task getReadyTask() {
+		try {
+			return readyTaskQueue.take();
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+		return null;
 	}
 
 	/**
@@ -220,7 +236,7 @@ public class SpaceImpl extends UnicastRemoteObject implements Space {
 			e.printStackTrace();
 		}
 	}
-	
+
 	/**
 	 * Get Result from Result Queue. Call from Space Proxy in Universe.
 	 * 
@@ -245,15 +261,14 @@ public class SpaceImpl extends UnicastRemoteObject implements Space {
 	 */
 	@Override
 	public void register(final Computer computer) throws RemoteException {
-		final ComputerProxy computerproxy = new ComputerProxy(computer,ComputerID.getAndIncrement());
+		final ComputerProxy computerproxy = new ComputerProxy(computer,
+				ComputerID.getAndIncrement());
 		computer.setID(computerproxy.ID);
 		computerProxies.put(computerproxy.ID, computerproxy);
 		computerproxy.start();
-		Logger.getLogger(this.getClass().getName()).log(
-				Level.INFO,
+		Logger.getLogger(this.getClass().getName()).log(Level.INFO,
 				"Computer {0} started with {1} threads",
-				new Object[] { computerproxy.ID,
-						computer.getProcessNum() });
+				new Object[] { computerproxy.ID, computer.getProcessNum() });
 	}
 
 	/**
@@ -263,15 +278,13 @@ public class SpaceImpl extends UnicastRemoteObject implements Space {
 	 * 
 	 * @param computer
 	 */
-	private void unregister(final Computer computer) {
-		ComputerProxy computerProxy = computerProxies.remove(computer);
+	private void unregister(ComputerProxy computerProxy) {
+		computerProxies.remove(computerProxy.ID);
 		Result result = null;
 		while ((result = computerProxy.intermediateResultQueue.poll()) != null) {
-			if (result.process(space,
-					computerProxy.runningTaskMap,
+			if (result.process(space, computerProxy.runningTaskMap,
 					computerProxy.intermediateResultQueue)) {
-				computerProxy.runningTaskMap.remove(result
-						.getResultId());
+				computerProxy.runningTaskMap.remove(result.getResultId());
 			}
 			if (Config.STATUSOUTPUT) {
 				System.out.println("Unregister Result: " + result.getResultId()
@@ -279,12 +292,10 @@ public class SpaceImpl extends UnicastRemoteObject implements Space {
 			}
 		}
 		if (!computerProxy.runningTaskMap.isEmpty()) {
-			for (String taskId : computerProxy.runningTaskMap
-					.keySet()) {
+			for (String taskId : computerProxy.runningTaskMap.keySet()) {
 				try {
 					readyTaskQueue
-							.put(computerProxy.runningTaskMap
-									.get(taskId));
+							.put(computerProxy.runningTaskMap.get(taskId));
 					if (Config.STATUSOUTPUT) {
 						System.out.println("Unregister@Task:" + taskId);
 					}
@@ -293,7 +304,6 @@ public class SpaceImpl extends UnicastRemoteObject implements Space {
 				}
 			}
 		}
-
 		Logger.getLogger(this.getClass().getName()).log(Level.WARNING,
 				"Computer {0} failed.", computerProxy.ID);
 	}
@@ -311,11 +321,11 @@ public class SpaceImpl extends UnicastRemoteObject implements Space {
 	 */
 	@SuppressWarnings("unchecked")
 	public <T> void spaceExecuteTask(SuccessorTask<T> successortask,
-			BlockingQueue<Result> TempResultQueue) {
+			BlockingQueue<Result> intermediateResultQueue) {
 		successorTaskMap.remove(successortask.getTaskID());
 		ValueResult<T> result = (ValueResult<T>) successortask.execute();
 		try {
-			TempResultQueue.put(result);
+			intermediateResultQueue.put(result);
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
@@ -323,7 +333,6 @@ public class SpaceImpl extends UnicastRemoteObject implements Space {
 			System.out.println(result.getResultId());
 		}
 	}
-
 
 	/**
 	 * 
@@ -338,12 +347,12 @@ public class SpaceImpl extends UnicastRemoteObject implements Space {
 		 * Computer associated with this Computer Proxy.
 		 */
 		private final Computer computer;
-		
+
 		/**
 		 * Computer Id.
 		 */
 		private final int ID;
-		
+
 		/**
 		 * Running Task Map. The tasks that Computer is running.
 		 */
@@ -353,7 +362,7 @@ public class SpaceImpl extends UnicastRemoteObject implements Space {
 		 * Intermediate Result Queue. Store Results of Space Direct Execution
 		 */
 		private final BlockingQueue<Result> intermediateResultQueue;
-		
+
 		/**
 		 * Receive Service thread.
 		 */
@@ -369,17 +378,14 @@ public class SpaceImpl extends UnicastRemoteObject implements Space {
 		 * 
 		 * @param computer
 		 *            The Computer associated with this Computer Proxy.
+		 * @param comptuerid
+		 *            Computer ID
 		 */
-		private volatile boolean isReceiveException;
-
 		ComputerProxy(Computer computer, int computerid) {
 			this.computer = computer;
 			this.ID = computerid;
-
-			this.runningTaskMap = Collections
-					.synchronizedMap(new HashMap<>());
+			this.runningTaskMap = Collections.synchronizedMap(new HashMap<>());
 			this.intermediateResultQueue = new LinkedBlockingQueue<>();
-			isReceiveException = false;
 			this.receiveService = new ReceiveService();
 			this.sendService = new SendService();
 		}
@@ -408,11 +414,9 @@ public class SpaceImpl extends UnicastRemoteObject implements Space {
 						result = computer.takeResult();
 						if (result != null) {
 							synchronized (runningTaskMap) {
-								if (result.process(space,
-										runningTaskMap,
+								if (result.process(space, runningTaskMap,
 										intermediateResultQueue)) {
-									runningTaskMap.remove(result
-											.getResultId());
+									runningTaskMap.remove(result.getResultId());
 								}
 							}
 						}
@@ -420,20 +424,18 @@ public class SpaceImpl extends UnicastRemoteObject implements Space {
 						result = intermediateResultQueue.poll();
 						if (result != null) {
 							synchronized (runningTaskMap) {
-								if (result.process(space,
-										runningTaskMap,
+								if (result.process(space, runningTaskMap,
 										intermediateResultQueue)) {
-									runningTaskMap.remove(result
-											.getResultId());
+									runningTaskMap.remove(result.getResultId());
 								}
 							}
 						}
 					} catch (RemoteException ex) {
 						// If the Computer is down, unregister the Computer and
 						// save current working status.
-						System.out.println("Receive Exception!");
-						isReceiveException = true;
-						unregister(computer);
+						System.out.println("Receive Service: Computer " + ID
+								+ " is down!");
+						unregister(ComputerProxy.this);
 						return;
 					}
 				}
@@ -450,38 +452,22 @@ public class SpaceImpl extends UnicastRemoteObject implements Space {
 			public void run() {
 				while (true) {
 					Task task = null;
+					task = space.getReadyTask();
 					try {
-						// Get a task from Space Ready Task Queue.
-						task = readyTaskQueue.poll();
-						if (task != null) {
-							synchronized (runningTaskMap) {
-								// Put the task to Computer's Ready Task
-								// Queue.
-								computer.addTask(task);
-								// Put the task into Computer Proxy Running
-								// Task
-								// Map.
-								runningTaskMap.put(
-										task.getTaskID(), task);
-							}
-						} else {
-							if (isReceiveException) {
-								System.out.println("Send knows Exception!");
-								return;
-							}
+						synchronized (runningTaskMap) {
+							computer.addTask(task);
+							runningTaskMap.put(task.getTaskID(), task);
 						}
-					} catch (RemoteException ex) {
-						System.out.println("Send Exception!");
-						try {
-							readyTaskQueue.put(task);
-						} catch (InterruptedException e) {
-							e.printStackTrace();
-						}
+					} catch (RemoteException e) {
+						System.out.println("Send Service: Computer " + ID
+								+ " is down!");
+						space.addReadyTask(task);
 						return;
 					}
 				}
 			}
 		}
+
 	}
 
 }

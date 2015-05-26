@@ -320,11 +320,11 @@ public class ServerImpl extends UnicastRemoteObject implements Server {
 		 * @return Task ID
 		 */
 		private String submitTask(Task task) {
-			task.setTaskID(ServerImpl.this.ID + ":" + this.ID + ":"
-					+ ServerImpl.this.makeTaskID());
-			task.setTargetTaskID(ServerImpl.this.ID + ":" + this.ID + ":"
-					+ ServerImpl.this.makeTaskID() + ":" + "-1");
-			ServerImpl.this.addTask(task);
+			task.setTaskID(server.ID + ":" + this.ID + ":"
+					+ server.makeTaskID());
+			task.setTargetTaskID(server.ID + ":" + this.ID + ":"
+					+ server.makeTaskID() + ":" + "-1");
+			server.addTask(task);
 			return task.getTaskID();
 		}
 
