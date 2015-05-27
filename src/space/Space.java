@@ -3,8 +3,8 @@ package space;
 import java.rmi.Remote;
 import java.rmi.RemoteException;
 
-import api.Result;
-import api.Task;
+import result.Result;
+import task.Task;
 import computer.Computer;
 
 /**
@@ -41,7 +41,7 @@ public interface Space extends Remote {
 	 * @throws RemoteException
 	 *             Cannot connect with Space.
 	 */
-	public void addTask(final Task task) throws RemoteException;
+	public void addTask(final Task<?> task) throws RemoteException;
 
 	/**
 	 * Get Result from Result Queue. Call from Space Proxy in Universe.

@@ -2,7 +2,8 @@ package tasks;
 
 import java.util.List;
 
-import api.Result;
+import config.Config;
+import result.Result;
 import result.ValueResult;
 import task.SuccessorTask;
 
@@ -34,6 +35,19 @@ public class FibonacciSuccessorTask extends SuccessorTask<Integer> {
 	}
 
 	/**
+	 * Check if the Task is coarse or not.
+	 * 
+	 * @return True if the Task is coarse. False otherwise.
+	 */
+	@Override
+	public boolean isCoarse() {
+		if (getLayer() <= Config.FibonacciCoarse)
+			return true;
+		else
+			return false;
+	}
+
+	/**
 	 * Execute the task and generate a Value Result. Calculate the sum of its
 	 * arguments.
 	 */
@@ -43,19 +57,18 @@ public class FibonacciSuccessorTask extends SuccessorTask<Integer> {
 		List<Integer> list = this.getArg();
 		Integer sum = 0;
 		for (Integer i : list) {
+			if (i == null) {
+				if (Config.DEBUG) {
+					System.out.println("Successor " + this.getID()
+							+ " has null arg!");
+				}
+			}
 			sum += i;
 		}
 		long taskEndTime = System.nanoTime();
-		return new ValueResult<Integer>(this.getTaskID(), sum,
-				this.getTargetTaskID(), this.getTargetSuccessorTaskArgIndex(),
+		return new ValueResult<Integer>(this.getID(), sum, this.getTargetID(),
+				this.getTargetSuccessorTaskArgIndex(), isCoarse(),
 				taskStartTime, taskEndTime);
 	}
-	
-	@Override
-	public boolean isCoarse() {
-		if (getLayer() <= 3)
-			return true;
-		else
-			return false;
-	}
+
 }

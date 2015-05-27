@@ -2,11 +2,12 @@ package tasks;
 
 import java.util.*;
 
-import api.Result;
+import config.Config;
+import result.Result;
 import result.TaskResult;
 import result.ValueResult;
 import task.ReadyTask;
-import api.Task;
+import task.Task;
 
 /**
  * TspReadyTask is a decomposing task of traveling salesman problem in divide
@@ -72,7 +73,6 @@ public class TspReadyTask extends ReadyTask<TspData> {
 	 */
 	public TspReadyTask(List<TspData> arg, int numOfCities, double[][] DISTANCE) {
 		super(arg);
-
 		this.numOfCities = numOfCities;
 		distance = new double[numOfCities][numOfCities];
 		for (int i = 0; i < numOfCities; ++i)
@@ -92,6 +92,19 @@ public class TspReadyTask extends ReadyTask<TspData> {
 			return true;
 		}
 		return false;
+	}
+
+	/**
+	 * Check if the Task is coarse or not.
+	 * 
+	 * @return True if the Task is coarse. False otherwise.
+	 */
+	@Override
+	public boolean isCoarse() {
+		if (getLayer() <= Config.TSPCoarse)
+			return true;
+		else
+			return false;
 	}
 
 	/**
@@ -131,13 +144,12 @@ public class TspReadyTask extends ReadyTask<TspData> {
 			TspData solved = new TspData(min, res, new LinkedList<Integer>());
 
 			long taskEndTime = System.nanoTime();
-			return new ValueResult<TspData>(this.getTaskID(), solved,
-					this.getTargetSuccessorTaskId(),
-					this.getTargetSuccessorTaskArgIndex(), taskStartTime,
-					taskEndTime);
+			return new ValueResult<TspData>(this.getID(), solved,
+					this.getTargetID(), this.getTargetSuccessorTaskArgIndex(),
+					isCoarse(), taskStartTime, taskEndTime);
 		} else {
-			List<Task> runningtasks = new ArrayList<Task>();
-			List<Task> subtasks = new ArrayList<Task>();
+			List<Task<TspData>> runningtasks = new ArrayList<Task<TspData>>();
+			List<Task<TspData>> subtasks = new ArrayList<Task<TspData>>();
 			List<TspData> arg = new ArrayList<TspData>();
 			int argNum = unordered.size();
 
@@ -146,10 +158,9 @@ public class TspReadyTask extends ReadyTask<TspData> {
 			}
 
 			TspSuccessorTask successorTask = new TspSuccessorTask(arg, argNum,
-					this.getTargetSuccessorTaskId(),
-					this.getTargetSuccessorTaskArgIndex());
+					this.getTargetID(), this.getTargetSuccessorTaskArgIndex());
 			successorTask.setLayer(getLayer());
-			
+
 			successorTask.setSpaceRunnable(true);
 			subtasks.add(successorTask);
 
@@ -169,7 +180,7 @@ public class TspReadyTask extends ReadyTask<TspData> {
 
 				TspReadyTask child = new TspReadyTask(arg, i, numOfCities,
 						distance);
-				child.setLayer(getLayer()+1);
+				child.setLayer(getLayer() + 1);
 
 				if (i < numOfRunningTasks)
 					runningtasks.add(child);
@@ -177,7 +188,7 @@ public class TspReadyTask extends ReadyTask<TspData> {
 					subtasks.add(child);
 			}
 			long taskEndTime = System.nanoTime();
-			return new TaskResult(this.getTaskID(), subtasks, runningtasks,
+			return new TaskResult<TspData>(this.getID(), subtasks, isCoarse(),
 					taskStartTime, taskEndTime);
 		}
 	}
@@ -224,12 +235,5 @@ public class TspReadyTask extends ReadyTask<TspData> {
 		}
 		return result;
 	}
-	
-	@Override
-	public boolean isCoarse() {
-		if (getLayer() <= 3)
-			return true;
-		else
-			return false;
-	}
+
 }

@@ -16,13 +16,18 @@ import javax.swing.ImageIcon;
 import javax.swing.JLabel;
 
 import result.ValueResult;
-import task.ReadyTask;
+import server.Server;
+import task.Task;
 import tasks.TspData;
 import tasks.TspReadyTask;
 
-public class ClientTsp extends ClientImpl<List<Integer>> {
+public class ClientTsp extends Client<List<Integer>, double[][]> {
 	private static final long serialVersionUID = 4192126821917742620L;
 	private static final int NUM_PIXALS = 600;
+
+	public ClientTsp(String clientName) {
+		super("TSP", clientName);
+	}
 
 	/**
 	 * Prepare a TSP Ready Task
@@ -31,7 +36,8 @@ public class ClientTsp extends ClientImpl<List<Integer>> {
 	 *            Cities
 	 * @return TSP Ready Task
 	 */
-	public static ReadyTask<TspData> makeReadyTask(final double[][] cities) {
+	@Override
+	public Task<TspData> makeTask(double[][] cities) {
 		double[][] distance = calDistance(cities);
 		final int numOfCities = cities.length;
 		List<Integer> ordered = new ArrayList<Integer>();
@@ -39,48 +45,74 @@ public class ClientTsp extends ClientImpl<List<Integer>> {
 		List<Integer> unordered = new ArrayList<Integer>();
 		for (int i = 1; i < numOfCities; ++i)
 			unordered.add(i);
-
 		TspData data = new TspData(-8, ordered, unordered);
-
 		List<TspData> args = new ArrayList<TspData>();
 		args.add(data);
-
 		return new TspReadyTask(args, numOfCities, distance);
-	}
-
-	public ClientTsp(String domainName) throws RemoteException,
-			NotBoundException, MalformedURLException {
-		super("TSP", domainName);
 	}
 
 	@SuppressWarnings("unchecked")
 	public static void main(String[] args) throws Exception {
 		System.setSecurityManager(new SecurityManager());
 
-		String ServerDomainName = args.length == 0 ? "localhost" : args[0];
-		ClientTsp client = new ClientTsp(ServerDomainName);
-
+		String serverDomainName = args.length == 0 ? "localhost" : args[0];
+		ClientTsp client = new ClientTsp("ClientTSP");
 		client.begin();
-		double[][] CITIES = { { 1, 1 }, { 8, 1 }, { 8, 8 }, { 1, 8 },
-				{ 2, 2 }, { 7, 2 }, { 7, 7 }, { 2, 7 }, { 3, 3 }, { 6, 3 },
-				{ 6, 6 }, { 3, 6 } };
-		ReadyTask<TspData> tspTask = makeReadyTask(CITIES);
-		client.addTask(tspTask);
 
-		ValueResult<TspData> result = (ValueResult<TspData>) client.getResult();
-		TspData tspData = result.getResultValue();
-		List<Integer> minTour;
-		minTour = tspData.getOrderedCities();
-		minTour.add(0);
-
-		client.add(client.getLabel(minTour.toArray(new Integer[0]), CITIES));
+		double[][] CITIES = { { 1, 1 }, { 8, 1 }, { 8, 8 }, { 1, 8 }, { 2, 2 },
+				{ 7, 2 }, { 7, 7 }, { 2, 7 }, { 3, 3 }, { 6, 3 }, { 6, 6 },
+				{ 3, 6 } };
+		Task<TspData> tspTask = client.makeTask(CITIES);
+		try {
+			Server server = client.findServer(serverDomainName);
+			if (!server.register(client.getName(), null)) {
+				System.out.println("Failed to register in Server");
+			} else {
+				String taskID = server.submit(tspTask, client.getName());
+				Logger.getLogger(Client.class.getCanonicalName()).log(
+						Level.INFO, "Task: TSP({0}) is submitted. ID is {1}",
+						new Object[] { CITIES.length, taskID });
+				ValueResult<TspData> result = (ValueResult<TspData>) server
+						.getResult(client.getName());
+				TspData tspData = result.getResultValue();
+				List<Integer> minTour;
+				minTour = tspData.getOrderedCities();
+				minTour.add(0);
+				client.add(client.getLabel(minTour.toArray(new Integer[0]),
+						CITIES));
+			}
+		} catch (MalformedURLException | NotBoundException e) {
+			System.out.println("Bad Server domain name!");
+		} catch (RemoteException e) {
+			System.out.println("Cannot regiseter to the Server!");
+		}
 		client.end();
 	}
 
+	private String tourToString(Integer[] cities) {
+		StringBuilder stringBuilder = new StringBuilder();
+		stringBuilder.append("Tour: ");
+		for (Integer city : cities) {
+			stringBuilder.append(city).append(' ');
+		}
+		return stringBuilder.toString();
+	}
+
+	private static double[][] calDistance(double[][] CITIES) {
+		int numOfCities = CITIES.length;
+		double[][] distance = new double[numOfCities][numOfCities];
+
+		for (int i = 0; i < numOfCities; ++i)
+			for (int j = 0; j < numOfCities; ++j)
+				distance[i][j] = Math.sqrt(Math.pow(
+						CITIES[i][0] - CITIES[j][0], 2)
+						+ Math.pow(CITIES[i][1] - CITIES[j][1], 2));
+		return distance;
+	}
+	
 	public JLabel getLabel(final Integer[] tour, final double[][] cities) {
 		Logger.getLogger(ClientTsp.class.getCanonicalName()).log(Level.INFO,
 				tourToString(tour));
-
 		// display the graph graphically, as it were
 		// get minX, maxX, minY, maxY, assuming they 0.0 <= mins
 		double minX = cities[0][0], maxX = cities[0][0];
@@ -142,24 +174,4 @@ public class ClientTsp extends ClientImpl<List<Integer>> {
 		return new JLabel(imageIcon);
 	}
 
-	private String tourToString(Integer[] cities) {
-		StringBuilder stringBuilder = new StringBuilder();
-		stringBuilder.append("Tour: ");
-		for (Integer city : cities) {
-			stringBuilder.append(city).append(' ');
-		}
-		return stringBuilder.toString();
-	}
-
-	private static double[][] calDistance(double[][] CITIES) {
-		int numOfCities = CITIES.length;
-		double[][] distance = new double[numOfCities][numOfCities];
-
-		for (int i = 0; i < numOfCities; ++i)
-			for (int j = 0; j < numOfCities; ++j)
-				distance[i][j] = Math.sqrt(Math.pow(
-						CITIES[i][0] - CITIES[j][0], 2)
-						+ Math.pow(CITIES[i][1] - CITIES[j][1], 2));
-		return distance;
-	}
 }

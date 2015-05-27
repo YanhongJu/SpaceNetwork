@@ -3,8 +3,8 @@ package computer;
 import java.rmi.Remote;
 import java.rmi.RemoteException;
 
-import api.Result;
-import api.Task;
+import result.Result;
+import task.Task;
 
 /**
  * Computer interface is exposed to Computer and Space.
@@ -38,7 +38,7 @@ public interface Computer extends Remote {
 	 * @throws RemoteException
 	 *             Failed to connect to Computer.
 	 */
-	public void addTask(Task task) throws RemoteException;
+	public void addTask(Task<?> task) throws RemoteException;
 
 	/**
 	 * Get a Result from Result Queue. Call from Computer Proxy in Space.
@@ -48,18 +48,6 @@ public interface Computer extends Remote {
 	 *             Failed to connect to computer.
 	 */
 	public Result getResult() throws RemoteException;
-
-	/**
-	 * Execute the Task.
-	 * 
-	 * @param task
-	 *            The Task to be executed.
-	 * @return Result of the execution.
-	 * @throws RemoteException
-	 *             Failed to connect to Computer.
-	 * 
-	 */
-	public Result execute(Task task) throws RemoteException;
 
 	/**
 	 * Exit

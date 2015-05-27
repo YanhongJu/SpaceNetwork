@@ -16,10 +16,9 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import config.Config;
+import result.Result;
+import task.Task;
 import universe.Universe;
-import client.ClientImpl;
-import api.Result;
-import api.Task;
 
 public class ServerImpl extends UnicastRemoteObject implements Server {
 	private static final long serialVersionUID = -7458792337176706359L;
@@ -40,19 +39,14 @@ public class ServerImpl extends UnicastRemoteObject implements Server {
 	private static final AtomicInteger TaskID = new AtomicInteger();
 
 	/**
-	 * Client ID. Assign to Client.
-	 */
-	private static final AtomicInteger ClientID = new AtomicInteger();
-
-	/**
 	 * Ready Task Queue. Take Tasks from Client and to be taken by Universe
 	 */
-	private final BlockingQueue<Task> readyTaskQueue;
+	private final BlockingQueue<Task<?>> readyTaskQueue;
 
 	/**
 	 * Client Proxies Map. All registered Clients.
 	 */
-	private final Map<Integer, ClientProxy> clientProxies;
+	private final Map<String, ClientProxy> clientProxies;
 
 	/**
 	 * Constructor of Server Implementation. Register to the Universe.
@@ -132,7 +126,7 @@ public class ServerImpl extends UnicastRemoteObject implements Server {
 	 * @return Task ID.
 	 */
 	private int makeTaskID() {
-		return TaskID.getAndIncrement();
+		return TaskID.incrementAndGet();
 	}
 
 	/**
@@ -141,7 +135,7 @@ public class ServerImpl extends UnicastRemoteObject implements Server {
 	 * @param task
 	 *            Task to be added.
 	 */
-	private void addTask(Task task) {
+	private void addTask(Task<?> task) {
 		try {
 			readyTaskQueue.put(task);
 		} catch (InterruptedException e) {
@@ -157,7 +151,7 @@ public class ServerImpl extends UnicastRemoteObject implements Server {
 	 *             Cannot connect with Server.
 	 */
 	@Override
-	public Task getTask() throws RemoteException {
+	public Task<?> getTask() throws RemoteException {
 		try {
 			return readyTaskQueue.take();
 		} catch (InterruptedException e) {
@@ -177,8 +171,8 @@ public class ServerImpl extends UnicastRemoteObject implements Server {
 	 */
 	@Override
 	public void dispatchResult(final Result result) throws RemoteException {
-		String resultID[] = result.getResultId().split(":");
-		int clientID = Integer.parseInt(resultID[1]);
+		String resultID[] = result.getID().split(":");
+		String clientID = resultID[0];
 		if (clientProxies.containsKey(clientID)) {
 			clientProxies.get(clientID).addResult(result);
 		}
@@ -193,14 +187,33 @@ public class ServerImpl extends UnicastRemoteObject implements Server {
 	 *             Cannot connect with Server.
 	 */
 	@Override
-	public void register(final ClientImpl<?> client) throws RemoteException {
-		final ClientProxy clientProxy = new ClientProxy(client,
-				ClientID.getAndIncrement());
-		client.setID(234);
-		clientProxies.put(clientProxy.ID, clientProxy);
+	public boolean register(final String clientName, final String duration)
+			throws RemoteException {
+		if (clientName == null || clientProxies.containsKey(clientName)) {
+			System.out.println("Client Name already exists!");
+			return false;
+		}
+		int timelimit;
+		if (duration == null) {
+			timelimit = Config.ClientTimeDefault;
+		} else {
+			String time[] = duration.split(":");
+			if (time.length == 1) {
+				timelimit = Integer.parseInt(time[0]);
+			} else {
+				timelimit = Integer.parseInt(time[0]) * 60
+						+ Integer.parseInt(time[1]);
+			}
+		}
+		if (timelimit > Config.ClientTimeLimit) {
+			return false;
+		}
+		final ClientProxy clientProxy = new ClientProxy(clientName, timelimit);
+		clientProxies.put(clientName, clientProxy);
 		clientProxy.start();
 		Logger.getLogger(this.getClass().getName()).log(Level.INFO,
-				"Client {0} starts!", clientProxy.ID);
+				"Client {0} starts!", clientName);
+		return true;
 	}
 
 	/**
@@ -211,17 +224,50 @@ public class ServerImpl extends UnicastRemoteObject implements Server {
 	 *            Associated Cient Proxy.
 	 */
 	private void unregister(ClientProxy clientProxy) {
-		clientProxies.remove(clientProxy.ID);
+		clientProxies.remove(clientProxy.name);
 		synchronized (readyTaskQueue) {
-			for (Task task : readyTaskQueue) {
-				String taskID[] = task.getTaskID().split(":");
-				if (taskID[1].equals(clientProxy.ID)) {
+			for (Task<?> task : readyTaskQueue) {
+				String taskID[] = task.getID().split(":");
+				if (taskID[1].equals(clientProxy.name)) {
 					readyTaskQueue.remove(task);
 				}
 			}
 		}
 		Logger.getLogger(this.getClass().getName()).log(Level.INFO,
-				"Client {0} is down!", clientProxy.ID);
+				"Client {0} is down!", clientProxy.name);
+	}
+
+	@Override
+	public boolean unregister(String clientname) throws RemoteException {
+		if (clientname == null || !clientProxies.containsKey(clientname)) {
+			System.out.println("Client is not registered in the Server");
+			return false;
+		}
+		clientProxies.remove(clientname).stop();
+		System.out.println("Client is unregistered in the Server.");
+		return true;
+	}
+
+	@Override
+	public String submit(Task<?> task, String clientname) throws RemoteException {
+		if (task == null) {
+			System.out.println("This Task is unacceptable!");
+			return null;
+		}
+		if (clientname == null || !clientProxies.containsKey(clientname)) {
+			System.out.println("Client is not registered in the Server");
+			return null;
+		}
+		return clientProxies.get(clientname).submitTask(task);
+	}
+
+	@Override
+	public Result getResult(String clientname) throws RemoteException {
+		if (clientname == null || !clientProxies.containsKey(clientname)) {
+			System.out.println("Client is not registered in the Server");
+			return null;
+		}
+		return clientProxies.get(clientname).getResult();
 	}
 
 	/**
@@ -234,12 +280,12 @@ public class ServerImpl extends UnicastRemoteObject implements Server {
 		/**
 		 * Client associated with the Client Proxy
 		 */
-		private final ClientImpl<?> client;
+		private final String name;
 
 		/**
-		 * Client Proxy ID
+		 * Client Task ID
 		 */
-		private final int ID;
+		private int taskID;
 
 		/**
 		 * Result Queue
@@ -247,14 +293,19 @@ public class ServerImpl extends UnicastRemoteObject implements Server {
 		private final LinkedBlockingQueue<Result> resultQueue;
 
 		/**
-		 * Send Service
+		 * Max run time.
 		 */
-		private final SendService sendService;
+		private final int timeLimit;
 
 		/**
-		 * Receive Service
+		 * Client Proxy start time.
 		 */
-		private final ReceiveService receiveService;
+		private long startTime;
+
+		/**
+		 * Timer of the client
+		 */
+		private final Timer timer;
 
 		/**
 		 * Constructor of Client Proxy
@@ -264,27 +315,44 @@ public class ServerImpl extends UnicastRemoteObject implements Server {
 		 * @param ID
 		 *            Client Proxy ID
 		 */
-		public ClientProxy(ClientImpl<?> client, int ID) {
-			this.client = client;
-			this.ID = ID;
+		public ClientProxy(String clientName, int timeLimit) {
+			this.name = clientName;
+			this.timeLimit = timeLimit;
+			this.timer = new Timer();
 			resultQueue = new LinkedBlockingQueue<Result>();
-			sendService = new SendService();
-			receiveService = new ReceiveService();
-			if(Config.DEBUG) {
-				try {
-					System.out.println("Server: client is " + client.getID());
-				} catch (RemoteException e) {
-					e.printStackTrace();
-				}
-			}
 		}
 
 		/**
-		 * Start Receive Service thread and Send Service thread
+		 * Start the timer.
 		 */
 		private void start() {
-			receiveService.start();
-			sendService.start();
+			startTime = System.currentTimeMillis();
+			this.timer.start();
+		}
+
+		/**
+		 * Start the timer.
+		 */
+		private double stop() {
+			this.timer.interrupt();
+			return getRunTime();
+		}
+
+		/**
+		 * Make Task ID
+		 * 
+		 * @return Task ID
+		 */
+		private int makeTaskID() {
+			return ++this.taskID;
+		}
+
+		/**
+		 * Get run time.
+		 */
+		private double getRunTime() {
+			double runTime = (System.currentTimeMillis() - startTime) / 1000 / 60;
+			return runTime;
 		}
 
 		/**
@@ -310,10 +378,6 @@ public class ServerImpl extends UnicastRemoteObject implements Server {
 			try {
 				return resultQueue.take();
 			} catch (InterruptedException e) {
-				if (Config.STATUSOUTPUT) {
-					e.printStackTrace();
-					System.out.println("Receive Service is interrupted!");
-				}
 			}
 			return null;
 		}
@@ -326,79 +390,30 @@ public class ServerImpl extends UnicastRemoteObject implements Server {
 		 *            Task to be submitted.
 		 * @return Task ID
 		 */
-		private String submitTask(Task task) {
-			task.setTaskID(server.ID + ":" + this.ID + ":"
+		private String submitTask(Task<?> task) {
+			task.setID(this.name + ":" + makeTaskID() + ":" + server.ID + ":S"
 					+ server.makeTaskID());
-			task.setTargetTaskID(server.ID + ":" + this.ID + ":"
-					+ server.makeTaskID() + ":" + "-1");
-			if(Config.DEBUG) {
-				System.out.println("Server: Task ID generated:" + task.getTaskID());
-			}
+			task.setTargetID(task.getID() + ":" + "-1");
 			server.addTask(task);
-			if(Config.DEBUG) {
-				System.out.println("Server: Task is added.");
+			if (Config.DEBUG) {
+				System.out.println("Client Proxy: Task " + task.getID()
+						+ " is added.");
 			}
-			return task.getTaskID();
+			return task.getID();
 		}
 
-		/**
-		 * 
-		 * Receive Service is a thread for taking Result from the Server Result
-		 * Map.
-		 *
-		 */
-		private class ReceiveService extends Thread {
+		private class Timer extends Thread {
 			@Override
 			public void run() {
-				while (true) {
-					Result result = getResult();
-					try {
-						client.addResult(result);
-						// client.addResult(getResult());  Better?
-					} catch (RemoteException e) {
-						e.printStackTrace();
-						System.out.println("ReceiveService : Client " + ID
-								+ " is Down!");
-						return;
-						// If Client is down abnormally, should clean the
-						// Universe.Maybe in future. Discard the result.
-					}
+				try {
+					Thread.sleep(timeLimit * 60 * 1000);
+				} catch (InterruptedException e) {
+				} finally {
+					unregister(ClientProxy.this);
 				}
 			}
 		}
 
-		/**
-		 * Send Service is a thread for putting Tasks from Client to the
-		 * Server's Ready Task Queue.
-		 *
-		 */
-		private class SendService extends Thread {
-			@Override
-			public void run() {
-				while (true) {
-					try {
-						Task task = client.getTask();
-						String submittedtaskID = submitTask(task);
-						client.addTaskID(submittedtaskID);
-						if(Config.DEBUG) {
-							System.out.println(submittedtaskID);
-						}
-						// client.addTaskID(submitTask(client.getTask()));
-					} catch (RemoteException e) {
-						e.printStackTrace();
-						System.out.println("SendService : Client " + ID
-								+ " is Down!");
-						if (ClientProxy.this.receiveService.isAlive()) {
-							ClientProxy.this.receiveService.interrupt();
-						}
-						unregister(ClientProxy.this);
-						return;
-						// If Client is down abnormally, should clean the
-						// Universe.Maybe in future
-					}
-				}
-			}
-		}
 	}
 
 }

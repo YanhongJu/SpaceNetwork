@@ -2,8 +2,6 @@ package task;
 
 import java.util.List;
 
-import api.Task;
-
 /**
  * 
  * A Ready Task is a task that is ready to run. In Divide and Conquer context,
@@ -14,19 +12,14 @@ import api.Task;
  * @param <T>
  *            Argument type of the task.
  */
-public abstract class ReadyTask<T> extends Task {
+public abstract class ReadyTask<T> extends Task<T> {
 	private static final long serialVersionUID = -998071752240333400L;
 	
 	/**
 	 * Target Successor Task's Argument Index.
 	 */
-	private int targetSuccessorTaskArgIndex;
+	protected int targetSuccessorTaskArgIndex;
 	
-	/**
-	 * Argument list.
-	 */
-	private List<T> arg;
-
 	/**
 	 * Constructor of Ready Task.
 	 * 
@@ -36,8 +29,7 @@ public abstract class ReadyTask<T> extends Task {
 	 *            Target Successoor Task Argument Index.
 	 */
 	public ReadyTask(List<T> arg, int targetSuccessorTaskArgIndex) {
-		super();
-		this.arg = arg;
+		super(arg);
 		this.targetSuccessorTaskArgIndex = targetSuccessorTaskArgIndex;
 	}
 
@@ -48,37 +40,8 @@ public abstract class ReadyTask<T> extends Task {
 	 *            Argument List.
 	 */
 	public ReadyTask(List<T> arg) {
-		super();
-		this.arg = arg;
+		super(arg);
 		this.targetSuccessorTaskArgIndex = -1;
-	}
-
-	/**
-	 * Get the target successor task Id.
-	 * 
-	 * @return The target successor task Id.
-	 */
-	public String getTargetSuccessorTaskId() {
-		return super.getTargetTaskID();
-	}
-
-	/**
-	 * Set the target successor task Id.
-	 * 
-	 * @param targetSuccessorTaskId
-	 *            The target successor task Id to be set.
-	 */
-	public void setTargetSuccessorTaskId(String targetSuccessorTaskId) {
-		super.setTargetTaskID(targetSuccessorTaskId);
-	}
-
-	/**
-	 * Get the argument list.
-	 * 
-	 * @return the arg
-	 */
-	public List<T> getArg() {
-		return arg;
 	}
 
 	/**
@@ -87,7 +50,7 @@ public abstract class ReadyTask<T> extends Task {
 	 * @return True is the task is atomic and cannot be further decomposed.
 	 *         False otherwise.
 	 */
-	abstract public boolean isAtomic();
+	public abstract boolean isAtomic();
 
 	/**
 	 * 

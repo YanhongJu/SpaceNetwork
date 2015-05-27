@@ -1,13 +1,13 @@
 package result;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 
 import config.Config;
-import api.Result;
-import api.Task;
 import space.SpaceImpl;
+import task.Task;
 import universe.UniverseImpl;
 
 /**
@@ -15,26 +15,24 @@ import universe.UniverseImpl;
  * Task Result is to contain task result of a task execution.
  *
  */
-public class TaskResult extends Result {
+public class TaskResult<T> extends Result {
 	private static final long serialVersionUID = -1385375075612513989L;
 
 	/**
 	 * Subtasks.
 	 */
-	private List<Task> subTasks;
+	private List<Task<T>> subTasks;
 
 	/**
 	 * Running Tasks.
 	 */
-	private List<Task> runningTasks;
+	private List<Task<T>> runningTasks;
 
 	/**
 	 * Constructor of task result.
 	 * 
 	 * @param resultId
 	 *            Result Id, same as its associated task Id.
-	 * @param layer
-	 *            layer
 	 * @param subTasks
 	 *            Subtasks to be stored in Space. First task is a successor task
 	 *            to be stored in Successor Task Queue, following by child ready
@@ -47,12 +45,11 @@ public class TaskResult extends Result {
 	 * @param taskEndTime
 	 *            Task end time.
 	 */
-	public TaskResult(String resultId, List<Task> subTasks,
-			List<Task> runningTasks, long taskStartTime, long taskEndTime) {
-		super(resultId, taskStartTime, taskEndTime);
+	public TaskResult(String resultId, List<Task<T>> subTasks, boolean coarse,
+			long taskStartTime, long taskEndTime) {
+		super(resultId, TASKRESULT, coarse, taskStartTime, taskEndTime);
 		this.subTasks = subTasks;
-		this.runningTasks = runningTasks;
-		this.setResultType(TASKRESULT);
+		this.runningTasks = new ArrayList<Task<T>>();
 	}
 
 	/**
@@ -60,17 +57,35 @@ public class TaskResult extends Result {
 	 * 
 	 * @return the Subtasks
 	 */
-	public List<Task> getSubTasks() {
+	public List<Task<T>> getSubTasks() {
 		return subTasks;
 	}
 
 	/**
-	 * Get the Running tasks.
+	 * Get the Running Tasks.
 	 * 
 	 * @return the runningTask
 	 */
-	public List<Task> getRunningTask() {
+	public List<Task<T>> getRunningTasks() {
 		return runningTasks;
+	}
+
+	/**
+	 * Set some of child tasks to be running tasks.
+	 * 
+	 * @param num
+	 *            Number of child tasks to be running tasks.
+	 */
+	public void setRunningTasks(int num) {
+		if (num < 0 || num > subTasks.size()) {
+			num = 0;
+		}
+		for (int i = 1; i <= num; i++) {
+			runningTasks.add(subTasks.remove(i));
+		}
+		if(Config.DEBUG) {
+			System.out.println("SetRunningTasks Running Task Size: " + runningTasks.size());
+		}
 	}
 
 	/**
@@ -80,41 +95,29 @@ public class TaskResult extends Result {
 	 * @param space
 	 *            The Space implemetation in which the result is to be
 	 *            processed.
-	 * @param ComputerProxyRunningTaskMap
+	 * @param RunningTaskMap
 	 *            The Running Task Map in the Computer Proxy, where the
 	 *            associated task is stored.
-	 * @param TempResultQueue
-	 *            Temporary Result Queue in which the result can be stored if
+	 * @param intermediateResultQueue
+	 *            Intermediate Result Queue in which the result can be stored if
 	 *            result processing failed.
 	 */
 	@Override
-	public void process(final SpaceImpl space,
-			final Map<String, Task> RunningTaskMap,
+	public boolean process(final SpaceImpl space,
+			final Map<String, Task<?>> runningTaskMap,
 			final BlockingQueue<Result> intermediateResultQueue) {
-		if (Config.AmeliorationFlag) {
-			// Store the running tasks in the Computer Proxy Running Task Map.
-			for (int i = 0; i < runningTasks.size(); i++) {
-				RunningTaskMap.put(runningTasks.get(i).getTaskID(),
-						runningTasks.get(i));
-			}
-
-			// First task in subtasks is a successor. Put it into Space's
-			// Successor Task Queue.
-			space.addSuccessorTask(subTasks.get(0));
-
-			// Put rest tasks in subtasks into Space's Ready Task Queue.
-			for (int i = 1; i < subTasks.size(); i++) {
-				space.addReadyTask(subTasks.get(i));
-			}
-		} else {
-			for (int i = 0; i < runningTasks.size(); i++) {
-				space.addReadyTask(runningTasks.get(i));
-			}
-			space.addSuccessorTask(subTasks.get(0));
-			for (int i = 1; i < subTasks.size(); i++) {
-				space.addReadyTask(subTasks.get(i));
-			}
+		for (int i = 0; i < runningTasks.size(); i++) {
+			runningTaskMap
+					.put(runningTasks.get(i).getID(), runningTasks.get(i));
 		}
+		space.addSuccessorTask(subTasks.get(0));
+		if(Config.DEBUG) {
+			System.out.println("Space: Successor ID "+ subTasks.get(0).getID());
+		}
+		for (int i = 1; i < subTasks.size(); i++) {
+			space.addReadyTask(subTasks.get(i));
+		}
+		return true;
 	}
 
 	/**
@@ -129,14 +132,13 @@ public class TaskResult extends Result {
 	 *         otherwise.
 	 */
 	@Override
-	public void process(UniverseImpl universe, Map<String, Task> runningTaskMap) {
-		for (int i = 0; i < runningTasks.size(); i++) {
-			universe.addReadyTask(runningTasks.get(i));
-		}
+	public void process(UniverseImpl universe, Map<String, Task<?>> runningTaskMap) {
 		universe.addSuccessorTask(subTasks.get(0));
 		for (int i = 1; i < subTasks.size(); i++) {
 			universe.addReadyTask(subTasks.get(i));
 		}
+		if(Config.DEBUG) {
+			System.out.println("Universe: Successor ID "+ subTasks.get(0).getID());
+		}
 	}
-
 }

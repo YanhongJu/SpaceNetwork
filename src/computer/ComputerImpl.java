@@ -10,10 +10,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import api.Result;
-import api.Task;
+import result.Result;
 import result.TaskResult;
 import space.Space;
+import task.Task;
 import config.Config;
 
 /**
@@ -32,12 +32,12 @@ public class ComputerImpl extends UnicastRemoteObject implements Computer {
 	/**
 	 * Task ID.
 	 */
-	private final static AtomicInteger taskID = new AtomicInteger();
+	private final static AtomicInteger TaskID = new AtomicInteger();
 
 	/**
 	 * Ready Task Queue.
 	 */
-	private final BlockingQueue<Task> readyTaskQueue;
+	private final BlockingQueue<Task<?>> readyTaskQueue;
 
 	/**
 	 * Result Queue.
@@ -140,7 +140,7 @@ public class ComputerImpl extends UnicastRemoteObject implements Computer {
 	 *             Failed to connect to Computer.
 	 */
 	@Override
-	public void addTask(Task task) throws RemoteException {
+	public void addTask(Task<?> task) throws RemoteException {
 		try {
 			readyTaskQueue.put(task);
 		} catch (InterruptedException e) {
@@ -165,7 +165,7 @@ public class ComputerImpl extends UnicastRemoteObject implements Computer {
 	 * 
 	 * @return Task
 	 */
-	private Task getReadyTask() {
+	private Task<?> getReadyTask() {
 		try {
 			return readyTaskQueue.take();
 		} catch (InterruptedException e) {
@@ -174,6 +174,12 @@ public class ComputerImpl extends UnicastRemoteObject implements Computer {
 		return null;
 	}
 
+	/**
+	 * Add a Result to Result Queue.
+	 * 
+	 * @param result
+	 *            Result to be added.
+	 */
 	private void addResult(Result result) {
 		try {
 			resultQueue.put(result);
@@ -182,58 +188,14 @@ public class ComputerImpl extends UnicastRemoteObject implements Computer {
 		}
 	}
 
-	/*
-	 * Execute the task and generate the result. Assign every subtask with an
-	 * task ID.
-	 */
-	@Override
-	public Result execute(Task task) {
-		// Call the task's execution method.
-		final Result result = task.execute();
-		// If the result is Value Result, return the result directly.
-		if (result.getResultType() == Result.VALUERESULT) {
-			return result;
-		} else {
-			// If the result is Task Result, assign subtasks with Task ID.
-			List<Task> subtasks = ((TaskResult) result).getSubTasks();
-			// Assign Successor Task with an Task ID
-			Task successor = subtasks.get(0);
-			String successorTaskID = successor.getTaskID() + ":" + ID + ":"
-					+ Thread.currentThread().getId() + ":"
-					+ taskID.getAndIncrement();
-			successor.setTaskID(successorTaskID);
-			// Assign other Ready Task with Task IDs
-			for (int i = 1; i < subtasks.size(); i++) {
-				Task subtask = subtasks.get(i);
-				String taskid = subtask.getTaskID() + ":" + ID + ":"
-						+ Thread.currentThread().getId() + ":"
-						+ taskID.getAndIncrement();
-				subtask.setTaskID(taskid);
-				subtask.setTargetTaskID(successorTaskID);
-			}
-			// Assign running tasks with Task IDs and put them into Computer
-			// Ready Task Queue
-			List<Task> runningtasks = ((TaskResult) result).getRunningTask();
-			for (int i = 0; i < runningtasks.size(); i++) {
-				Task runningtask = runningtasks.get(i);
-				String taskid = runningtask.getTaskID() + ":" + ID + ":"
-						+ Thread.currentThread().getId() + ":"
-						+ taskID.getAndIncrement();
-				runningtask.setTaskID(taskid);
-				runningtask.setTargetTaskID(successorTaskID);
-			}
-		}
-		return result;
-	}
-
 	/**
 	 * Cache the subtasks in Task Result into Ready Task Queue.
 	 * 
 	 * @param result
 	 *            Task Result
 	 */
-	private void cacheTasks(TaskResult result) {
-		List<Task> runningtasks = result.getRunningTask();
+	private <T> void cacheTasks(TaskResult<T> result) {
+		List<Task<T>> runningtasks = result.getRunningTasks();
 		for (int i = 0; i < runningtasks.size(); i++) {
 			try {
 				readyTaskQueue.put(runningtasks.get(i));
@@ -241,6 +203,15 @@ public class ComputerImpl extends UnicastRemoteObject implements Computer {
 				e.printStackTrace();
 			}
 		}
+	}
+
+	/**
+	 * Generate a Task ID.
+	 * 
+	 * @return Task ID.
+	 */
+	private int makeTaskID() {
+		return TaskID.incrementAndGet();
 	}
 
 	/**
@@ -253,18 +224,67 @@ public class ComputerImpl extends UnicastRemoteObject implements Computer {
 		@Override
 		public void run() {
 			while (true) {
-				Task task = getReadyTask();
-				Result result = execute(task);
-				addResult(result);
-				if (Config.AmeliorationFlag) {
-					if (!result.isCoarse() && result.getResultType() == Result.TASKRESULT) {
-						cacheTasks((TaskResult) result);
-					}
+				Task<?> task = getReadyTask();
+				if (!task.getID().contains(":W")) {
+					task.setID(task.getID() + ":W" + makeTaskID());
 				}
 				if (Config.STATUSOUTPUT) {
-					System.out.println(result.getResultId());
+					System.out.println("Worker: Task " + task.getID()
+							+ " is taken!");
+				}
+				Result result = execute(task);
+				addResult(result);
+				if (Config.STATUSOUTPUT) {
+					System.out.println("Worker: Result " + result.getID()
+							+ " is added!");
+				}
+				if (result.isCoarse()) {
+					continue;
+				}
+				// Bug here!
+				if (Config.AmeliorationFlag) {
+					if (result.getType() == Result.TASKRESULT) {
+						((TaskResult<?>) result)
+								.setRunningTasks(Config.CacheTaskNum);
+						cacheTasks((TaskResult<?>) result);
+					}
 				}
 			}
+		}
+
+		/*
+		 * Execute the task and generate the result. Assign every subtask with
+		 * an task ID.
+		 */
+		private <T> Result execute(Task<T> task) {
+			// Call the task's execution method.
+			final Result result = task.execute();
+			// If the result is Value Result, return the result directly.
+			if (result.getType() == Result.VALUERESULT) {
+				return result;
+			} else {
+				// If the result is Task Result, assign subtasks with Task ID.
+				@SuppressWarnings("unchecked")
+				List<Task<T>> subtasks = (List<Task<T>>) ((TaskResult<T>) result)
+						.getSubTasks();
+				// Assign Successor Task with an Task ID
+				Task<?> successor = subtasks.get(0);
+				String taskid[] = task.getID().split(":"); 
+				successor.setID(task.getID().replace(":" + taskid[9], ":W" + makeTaskID()));
+				if (Config.STATUSOUTPUT) {
+					System.out.println("Worker: Successor " + successor.getID());
+				}
+				// Assign other Ready Task with Task IDs
+				for (int i = 1; i < subtasks.size(); i++) {
+					Task<?> subtask = subtasks.get(i);
+					subtask.setID(task.getID().replace(":" + taskid[9], ":W" + makeTaskID()));
+					if (Config.STATUSOUTPUT) {
+						System.out.println("Worker: Subtask " + subtask.getID() +  " -- " + subtask.getArg().get(0));
+					}
+					subtask.setTargetID(successor.getID());
+				}
+			}
+			return result;
 		}
 	}
 

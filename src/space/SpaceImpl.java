@@ -17,10 +17,10 @@ import java.util.logging.Logger;
 
 import computer.Computer;
 import config.Config;
-import api.Result;
-import api.Task;
+import result.Result;
 import result.ValueResult;
 import task.SuccessorTask;
+import task.Task;
 import universe.Universe;
 
 /**
@@ -49,12 +49,12 @@ public class SpaceImpl extends UnicastRemoteObject implements Space {
 	/**
 	 * Ready Task Queue. Containing tasks ready to run.
 	 */
-	private final BlockingQueue<Task> readyTaskQueue;
+	private final BlockingQueue<Task<?>> readyTaskQueue;
 
 	/**
 	 * Successor Task Map. Containing successor tasks waiting for arguments.
 	 */
-	private final Map<String, Task> successorTaskMap;
+	private final Map<String, Task<?>> successorTaskMap;
 
 	/**
 	 * Result Queue. Containing the final result of the coarse task.
@@ -148,7 +148,7 @@ public class SpaceImpl extends UnicastRemoteObject implements Space {
 	 *             Cannot connect with Space.
 	 */
 	@Override
-	public void addTask(final Task task) throws RemoteException {
+	public void addTask(final Task<?> task) throws RemoteException {
 		try {
 			readyTaskQueue.put(task);
 		} catch (InterruptedException e) {
@@ -162,7 +162,7 @@ public class SpaceImpl extends UnicastRemoteObject implements Space {
 	 * @param task
 	 *            Task to be added.
 	 */
-	public void addReadyTask(Task task) {
+	public void addReadyTask(Task<?> task) {
 		try {
 			readyTaskQueue.put(task);
 		} catch (InterruptedException e) {
@@ -175,7 +175,7 @@ public class SpaceImpl extends UnicastRemoteObject implements Space {
 	 * 
 	 * @return Task.
 	 */
-	public Task getReadyTask() {
+	public Task<?> getReadyTask() {
 		try {
 			return readyTaskQueue.take();
 		} catch (InterruptedException e) {
@@ -190,18 +190,8 @@ public class SpaceImpl extends UnicastRemoteObject implements Space {
 	 * @param task
 	 *            Task to be added.
 	 */
-	public void addSuccessorTask(Task task) {
-		successorTaskMap.put(task.getTaskID(), task);
-	}
-
-	/**
-	 * Remove a Successor Task from Successsor Task Map.
-	 * 
-	 * @param task
-	 *            Task to be removed.
-	 */
-	public void removeSuccessorTask(String taskID) {
-		successorTaskMap.remove(taskID);
+	public void addSuccessorTask(Task<?> task) {
+		successorTaskMap.put(task.getID(), task);
 	}
 
 	/**
@@ -211,7 +201,7 @@ public class SpaceImpl extends UnicastRemoteObject implements Space {
 	 *            Task Id.
 	 * @return A Successor Task.
 	 */
-	public Task getSuccessorTask(String TaskId) {
+	public Task<?> getSuccessorTask(String TaskId) {
 		return successorTaskMap.get(TaskId);
 	}
 
@@ -224,8 +214,8 @@ public class SpaceImpl extends UnicastRemoteObject implements Space {
 	 * @param successortask
 	 *            The ready-to-run successor task.
 	 */
-	public void successorToReady(Task successortask) {
-		successorTaskMap.remove(successortask.getTaskID());
+	public void successorToReady(Task<?> successortask) {
+		successorTaskMap.remove(successortask.getID());
 		try {
 			readyTaskQueue.put(successortask);
 		} catch (InterruptedException e) {
@@ -294,10 +284,10 @@ public class SpaceImpl extends UnicastRemoteObject implements Space {
 		while ((result = computerProxy.intermediateResultQueue.poll()) != null) {
 			result.process(space, computerProxy.runningTaskMap,
 					computerProxy.intermediateResultQueue);
-			computerProxy.runningTaskMap.remove(result.getResultId());
+			computerProxy.runningTaskMap.remove(result.getID());
 			if (Config.STATUSOUTPUT) {
-				System.out.println("Unregister Result: " + result.getResultId()
-						+ "!" + ((ValueResult<?>) result).getTargetTaskId());
+				System.out.println("Unregister Result: " + result.getID() + "!"
+						+ ((ValueResult<?>) result).getTargetTaskID());
 			}
 		}
 		if (!computerProxy.runningTaskMap.isEmpty()) {
@@ -331,7 +321,7 @@ public class SpaceImpl extends UnicastRemoteObject implements Space {
 	@SuppressWarnings("unchecked")
 	public <T> void spaceExecuteTask(SuccessorTask<T> successortask,
 			BlockingQueue<Result> intermediateResultQueue) {
-		successorTaskMap.remove(successortask.getTaskID());
+		successorTaskMap.remove(successortask.getID());
 		ValueResult<T> result = (ValueResult<T>) successortask.execute();
 		try {
 			intermediateResultQueue.put(result);
@@ -339,7 +329,7 @@ public class SpaceImpl extends UnicastRemoteObject implements Space {
 			e.printStackTrace();
 		}
 		if (Config.STATUSOUTPUT) {
-			System.out.println(result.getResultId());
+			System.out.println(result.getID());
 		}
 	}
 
@@ -363,9 +353,14 @@ public class SpaceImpl extends UnicastRemoteObject implements Space {
 		private final int ID;
 
 		/**
+		 * Task ID.
+		 */
+		private final AtomicInteger TaskID = new AtomicInteger();
+
+		/**
 		 * Running Task Map. The tasks that Computer is running.
 		 */
-		private final Map<String, Task> runningTaskMap;
+		private final Map<String, Task<?>> runningTaskMap;
 
 		/**
 		 * Intermediate Result Queue. Store Results of Space Direct Execution
@@ -408,6 +403,15 @@ public class SpaceImpl extends UnicastRemoteObject implements Space {
 		}
 
 		/**
+		 * Generate a Task ID.
+		 * 
+		 * @return Task ID.
+		 */
+		private int makeTaskID() {
+			return TaskID.incrementAndGet();
+		}
+
+		/**
 		 * Receive Service is a thread for non-blocking polling results from the
 		 * Computer's Result Queue as well as the Temporary Result Queue, and
 		 * process the result. If the result is processed successfully, remove
@@ -421,28 +425,52 @@ public class SpaceImpl extends UnicastRemoteObject implements Space {
 						// Get result from Computer Result Queue.
 						Result result = computer.getResult();
 						if (result != null) {
+							if (Config.DEBUG) {
+								System.out.println("Computer Proxy: Result "
+										+ result.getID() + " is taken!");
+							}
 							synchronized (runningTaskMap) {
 								if (result.isCoarse()) {
 									space.addResult(result);
-									removeSuccessorTask(result.getResultId());
+									if (Config.DEBUG) {
+										System.out.println("Computer Proxy: Result "
+												+ result.getID() + " is added!");
+									}
+									runningTaskMap.remove(result.getID());
 								} else {
-									result.process(space, runningTaskMap,
-											intermediateResultQueue);
-									removeSuccessorTask(result.getResultId());
+									if(!result.process(space, runningTaskMap,
+											intermediateResultQueue)) {
+										space.addResult(result);
+									}
+									runningTaskMap.remove(result.getID());
 								}
 							}
 						}
 						// Get the result from Intermediate Result Queue.
 						result = intermediateResultQueue.poll();
 						if (result != null) {
+							String resultID[] = result.getID().split(":");
+							StringBuffer resultid = new StringBuffer();
+							for (int i = 0; i <= 8; i++) {
+								resultid.append(resultID[i]);
+								resultid.append(":");
+							}
+							resultid.deleteCharAt(resultid.length() - 1);
+							String taskID = resultid.toString();
 							synchronized (runningTaskMap) {
 								if (result.isCoarse()) {
 									space.addResult(result);
-									removeSuccessorTask(result.getResultId());
+									if (Config.DEBUG) {
+										System.out.println("Computer Proxy: Result "
+												+ result.getID() + " is added!");
+									}
+									runningTaskMap.remove(result.getID());
 								} else {
-									result.process(space, runningTaskMap,
-											intermediateResultQueue);
-									removeSuccessorTask(result.getResultId());
+									if(!result.process(space, runningTaskMap,
+											intermediateResultQueue)) {
+										space.addResult(result);
+									}
+									runningTaskMap.remove(result.getID());
 								}
 							}
 						}
@@ -467,12 +495,18 @@ public class SpaceImpl extends UnicastRemoteObject implements Space {
 			@Override
 			public void run() {
 				while (true) {
-					Task task = space.getReadyTask();
-					task.setTaskID(task.getTargetTaskID() + ":" + SpaceImpl.ID);
+					Task<?> task = space.getReadyTask();
+					if (!task.getID().contains(":C")) {
+						task.setID(task.getID() + ":" + ID + ":C" + makeTaskID());
+					}
 					try {
 						synchronized (runningTaskMap) {
 							computer.addTask(task);
-							space.addSuccessorTask(task);
+							runningTaskMap.put(task.getID(), task);
+							if (Config.DEBUG) {
+								System.out.println("Computer Proxy: Task "
+										+ task.getID() + " is added!");
+							}
 						}
 					} catch (RemoteException e) {
 						System.out.println("Send Service: Computer " + ID

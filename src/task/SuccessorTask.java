@@ -2,13 +2,16 @@ package task;
 
 import java.util.List;
 
-import api.Task;
-
-public abstract class SuccessorTask<T> extends Task {
+public abstract class SuccessorTask<T> extends Task<T> {
 	private static final long serialVersionUID = 7837344432049161528L;
+	/**
+	 * Target Successor Task's Argument Index.
+	 */
 	private int targetSuccessorTaskArgIndex;
+	/**
+	 * Number of missing arguments
+	 */
 	private int missingArgNum;
-	private List<T> arg;
 
 	/**
 	 * Constructor of successor task. Call from inside.
@@ -24,10 +27,9 @@ public abstract class SuccessorTask<T> extends Task {
 	 */
 	public SuccessorTask(List<T> arg, int argNum, String targetSuccessorTaskId,
 			int targetSuccessorTaskArgIndex) {
-		super();
-		this.arg = arg;
+		super(arg);
 		this.missingArgNum = argNum;
-		this.setTargetTaskID(targetSuccessorTaskId);
+		this.setTargetID(targetSuccessorTaskId);
 		this.setTargetSuccessorTaskArgIndex(targetSuccessorTaskArgIndex);
 	}
 
@@ -45,34 +47,6 @@ public abstract class SuccessorTask<T> extends Task {
 	}
 
 	/**
-	 * Get the number of missing arguments.
-	 * 
-	 * @return the missingArgNum
-	 */
-	synchronized public int getMissingArgNum() {
-		return missingArgNum;
-	}
-
-	/**
-	 * Set the number of missing number of arguments.
-	 * 
-	 * @param missingArgNum
-	 *            the missingArgNum to set
-	 */
-	synchronized public void setMissingArgNum(int missingArgNum) {
-		this.missingArgNum = missingArgNum;
-	}
-
-	/**
-	 * Get the list of arguments.
-	 * 
-	 * @return the List of arguments.
-	 */
-	synchronized public List<T> getArg() {
-		return arg;
-	}
-
-	/**
 	 * Set the argument at the index position.
 	 * 
 	 * @param Index
@@ -81,28 +55,10 @@ public abstract class SuccessorTask<T> extends Task {
 	 *            Argument value.
 	 */
 	synchronized public void setArgAt(int Index, T value) {
-		assert Index >= 0 && value != null;
-		arg.set(Index, value);
-		missingArgNum--;
-	}
-
-	/**
-	 * Get the target successor task Id.
-	 * 
-	 * @return Target successor task Id.
-	 */
-	public String getTargetSuccessorTaskId() {
-		return super.getTargetTaskID();
-	}
-
-	/**
-	 * Set target successor task Id.
-	 * 
-	 * @param targetSuccessorTaskId
-	 *            Target successor task Id.
-	 */
-	public void setTargetSuccessorTaskId(String targetSuccessorTaskId) {
-		super.setTargetTaskID(targetSuccessorTaskId);
+		if(arg.get(Index) == null) {
+			((List<T>)arg).set(Index, value);
+			missingArgNum--;
+		}
 	}
 
 	/**
@@ -110,7 +66,7 @@ public abstract class SuccessorTask<T> extends Task {
 	 * 
 	 * @return the targetSuccessorTaskArgIndex
 	 */
-	synchronized public int getTargetSuccessorTaskArgIndex() {
+	public int getTargetSuccessorTaskArgIndex() {
 		return targetSuccessorTaskArgIndex;
 	}
 
@@ -120,7 +76,7 @@ public abstract class SuccessorTask<T> extends Task {
 	 * @param targetSuccessorTaskArgIndex
 	 *            the targetSuccessorTaskArgIndex to set
 	 */
-	synchronized public void setTargetSuccessorTaskArgIndex(
+	public void setTargetSuccessorTaskArgIndex(
 			int targetSuccessorTaskArgIndex) {
 		this.targetSuccessorTaskArgIndex = targetSuccessorTaskArgIndex;
 	}

@@ -2,7 +2,8 @@ package tasks;
 
 import java.util.*;
 
-import api.Result;
+import config.Config;
+import result.Result;
 import result.ValueResult;
 import task.SuccessorTask;
 
@@ -32,6 +33,19 @@ public class TspSuccessorTask extends SuccessorTask<TspData> {
 	}
 
 	/**
+	 * Check if the Task is coarse or not.
+	 * 
+	 * @return True if the Task is coarse. False otherwise.
+	 */
+	@Override
+	public boolean isCoarse() {
+		if (getLayer() <= Config.TSPCoarse)
+			return true;
+		else
+			return false;
+	}
+
+	/**
 	 * Executes the task and generates a Value Result. Finds the minimum tour.
 	 */
 	@Override
@@ -51,18 +65,11 @@ public class TspSuccessorTask extends SuccessorTask<TspData> {
 		}
 
 		TspData solved = new TspData(min, res, new LinkedList<Integer>());
-
+		boolean coarse = getLayer() - 1 == Config.FibonacciCoarse ? true
+				: false;
 		long taskEndTime = System.nanoTime();
-		return new ValueResult<TspData>(this.getTaskID(), solved,
-				this.getTargetTaskID(), this.getTargetSuccessorTaskArgIndex(),
-				taskStartTime, taskEndTime);
-	}
-	
-	@Override
-	public boolean isCoarse() {
-		if (getLayer() <= 3)
-			return true;
-		else
-			return false;
+		return new ValueResult<TspData>(this.getID(), solved,
+				this.getTargetID(), this.getTargetSuccessorTaskArgIndex(),
+				coarse, taskStartTime, taskEndTime);
 	}
 }

@@ -3,9 +3,8 @@ package server;
 import java.rmi.Remote;
 import java.rmi.RemoteException;
 
-import api.Result;
-import api.Task;
-import client.ClientImpl;
+import result.Result;
+import task.Task;
 
 public interface Server extends Remote {
 	/**
@@ -35,7 +34,7 @@ public interface Server extends Remote {
 	 * @throws RemoteException
 	 *             Cannot connect with Server.
 	 */
-	public Task getTask() throws RemoteException;
+	public Task<?> getTask() throws RemoteException;
 
 	/**
 	 * Dispatch the Result to corresponding Client Proxy. Call from Server Proxy
@@ -51,11 +50,45 @@ public interface Server extends Remote {
 	/**
 	 * Register a Client in Server. Call from Client.
 	 * 
-	 * @param client
+	 * @param clientname
 	 *            Client to be registered.
+	 * @return Status of register.
 	 * @throws RemoteException
 	 *             Cannot connect with Server.
 	 */
-	void register(final ClientImpl<?> client) throws RemoteException;
+	public boolean register(final String clientname, final String duration) throws RemoteException;
 
+	/**
+	 * Unregister a Client in Server. Call from Client.
+	 * 
+	 * @param clientname
+	 *            Client to be registered.
+	 * @return Status of register.
+	 * @throws RemoteException
+	 *             Cannot connect with Server
+	 */
+	public boolean unregister(final String clientname) throws RemoteException;
+
+	/**
+	 * Add a Task to the Ready Task Queue. Call from Client
+	 * 
+	 * @param task
+	 *            Task to be submitted.
+	 * @return Task ID
+	 * @throws RemoteException
+	 *             Cannot connect with Server
+	 */
+	String submit(final Task<?> task, final String clientname)
+			throws RemoteException;
+
+	/**
+	 * Get the Result of a Task.
+	 * 
+	 * @param clientname
+	 *            Client Name
+	 * @return Result
+	 * @throws RemoteException
+	 *             Cannot connect with Server
+	 */
+	Result getResult(final String clientname) throws RemoteException;
 }
