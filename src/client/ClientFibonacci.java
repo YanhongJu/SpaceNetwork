@@ -1,3 +1,4 @@
+
 package client;
 
 import java.net.MalformedURLException;
@@ -48,7 +49,7 @@ public class ClientFibonacci extends Client<Integer,Integer> {
 		System.setSecurityManager(new SecurityManager());
 
 		String serverDomainName = args.length == 0 ? "localhost" : args[0];
-		ClientFibonacci client = new ClientFibonacci("ClientFibonacci");
+		ClientFibonacci client = new ClientFibonacci("ClientFibonacci1");
 		client.begin();
 
 		int N = 20;
@@ -68,6 +69,7 @@ public class ClientFibonacci extends Client<Integer,Integer> {
 						Level.INFO, "Result: F({0}) is {1}",
 						new Object[] { N, result.getResultValue() });
 			}
+			server.unregister(client.getName());
 		} catch (MalformedURLException | NotBoundException e) {
 			System.out.println("Bad Server domain name!");
 		} catch (RemoteException e) {

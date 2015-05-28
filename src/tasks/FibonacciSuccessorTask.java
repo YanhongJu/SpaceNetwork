@@ -32,6 +32,7 @@ public class FibonacciSuccessorTask extends SuccessorTask<Integer> {
 	public FibonacciSuccessorTask(List<Integer> arg, int argNum,
 			String targetSuccessorTaskId, int targetSuccessorTaskArgIndex) {
 		super(arg, argNum, targetSuccessorTaskId, targetSuccessorTaskArgIndex);
+		this.setSpaceRunnable(true);
 	}
 
 	/**

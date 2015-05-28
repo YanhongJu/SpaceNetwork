@@ -16,7 +16,7 @@ import universe.UniverseImpl;
  *
  */
 public class TaskResult<T> extends Result {
-	private static final long serialVersionUID = -1385375075612513989L;
+	private static final long serialVersionUID = -6074269436373736220L;
 
 	/**
 	 * Subtasks.
@@ -52,6 +52,15 @@ public class TaskResult<T> extends Result {
 		this.runningTasks = new ArrayList<Task<T>>();
 	}
 
+	/* Orginal code */
+	public TaskResult(String resultId, List<Task<T>> subTasks,
+			List<Task<T>> runningTasks, boolean coarse, long taskStartTime,
+			long taskEndTime) {
+		super(resultId, TASKRESULT, coarse, taskStartTime, taskEndTime);
+		this.subTasks = subTasks;
+		this.runningTasks = runningTasks;
+	}
+
 	/**
 	 * Get the subtasks.
 	 * 
@@ -83,8 +92,13 @@ public class TaskResult<T> extends Result {
 		for (int i = 1; i <= num; i++) {
 			runningTasks.add(subTasks.remove(i));
 		}
-		if(Config.DEBUG) {
-			System.out.println("SetRunningTasks Running Task Size: " + runningTasks.size());
+		if (Config.DEBUG) {
+			for (Task i : runningTasks) {
+				System.out.println("Running task " + i.getArg());
+			}
+			// System.out.println("SetRunningTasks Running Task Size: " +
+			// runningTasks.size());
+
 		}
 	}
 
@@ -106,18 +120,46 @@ public class TaskResult<T> extends Result {
 	public boolean process(final SpaceImpl space,
 			final Map<String, Task<?>> runningTaskMap,
 			final BlockingQueue<Result> intermediateResultQueue) {
-		for (int i = 0; i < runningTasks.size(); i++) {
+		if (Config.AmeliorationFlag) {
+			// Store the running tasks in the Computer Proxy Running Task Map.
+			for (int i = 0; i < runningTasks.size(); i++) {
+				runningTaskMap.put(
+						runningTasks.get(i).getID(), runningTasks.get(i));
+			}
+
+			// First task in subtasks is a successor. Put it into Space's
+			// Successor
+			// Task Queue.
+			space.addSuccessorTask(subTasks.get(0));
+
+			// Put rest tasks in subtasks into Space's Ready Task Queue.
+			for (int i = 1; i < subTasks.size(); i++) {
+				space.addReadyTask(subTasks.get(i));
+			}
+		} else {
+			for (int i = 0; i < runningTasks.size(); i++) {
+				space.addReadyTask(runningTasks.get(i));
+			}
+			space.addSuccessorTask(subTasks.get(0));
+			for (int i = 1; i < subTasks.size(); i++) {
+				space.addReadyTask(subTasks.get(i));
+			}
+		}
+		return true;
+	
+	/*	for (int i = 0; i < runningTasks.size(); i++) {
 			runningTaskMap
 					.put(runningTasks.get(i).getID(), runningTasks.get(i));
 		}
 		space.addSuccessorTask(subTasks.get(0));
-		if(Config.DEBUG) {
-			System.out.println("Space: Successor ID "+ subTasks.get(0).getID());
+		if (Config.DEBUG) {
+			System.out
+					.println("Space: Successor ID " + subTasks.get(0).getID());
 		}
 		for (int i = 1; i < subTasks.size(); i++) {
 			space.addReadyTask(subTasks.get(i));
 		}
-		return true;
+		return true;*/
 	}
 
 	/**
@@ -132,13 +174,15 @@ public class TaskResult<T> extends Result {
 	 *         otherwise.
 	 */
 	@Override
-	public void process(UniverseImpl universe, Map<String, Task<?>> runningTaskMap) {
+	public void process(UniverseImpl universe,
+			Map<String, Task<?>> runningTaskMap) {
 		universe.addSuccessorTask(subTasks.get(0));
 		for (int i = 1; i < subTasks.size(); i++) {
 			universe.addReadyTask(subTasks.get(i));
 		}
-		if(Config.DEBUG) {
-			System.out.println("Universe: Successor ID "+ subTasks.get(0).getID());
+		if (Config.DEBUG) {
+			System.out.println("Universe: Successor ID "
+					+ subTasks.get(0).getID());
 		}
 	}
 }

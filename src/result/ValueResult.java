@@ -17,9 +17,9 @@ import universe.UniverseImpl;
  *            is the result value type.
  */
 public class ValueResult<ValueType> extends Result {
-	private static final long serialVersionUID = -6238390667632362323L;
+	private static final long serialVersionUID = -4600193385843282656L;
 
-	/**
+	/*
 	 * Target Successor Task Id of this value result.
 	 */
 	private String targetTaskId;

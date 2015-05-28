@@ -23,7 +23,8 @@ import config.Config;
  *
  */
 public class ComputerImpl extends UnicastRemoteObject implements Computer {
-	private final static long serialVersionUID = -3289346323918715850L;
+	private static final long serialVersionUID = 4049656705569742423L;
+
 	/**
 	 * Computer ID.
 	 */
@@ -68,7 +69,7 @@ public class ComputerImpl extends UnicastRemoteObject implements Computer {
 	public ComputerImpl() throws RemoteException {
 		resultQueue = new LinkedBlockingQueue<>();
 		if (Config.AmeliorationFlag) {
-			readyTaskQueue = new LinkedBlockingQueue<>(32);
+			readyTaskQueue = new LinkedBlockingQueue<>(100);
 		} else {
 			readyTaskQueue = new LinkedBlockingQueue<>(1);
 		}
@@ -157,7 +158,9 @@ public class ComputerImpl extends UnicastRemoteObject implements Computer {
 	 */
 	@Override
 	public Result getResult() throws RemoteException {
-		return resultQueue.poll();
+		Result result = null;
+		result = resultQueue.poll();
+		return result;
 	}
 
 	/**
@@ -199,6 +202,10 @@ public class ComputerImpl extends UnicastRemoteObject implements Computer {
 		for (int i = 0; i < runningtasks.size(); i++) {
 			try {
 				readyTaskQueue.put(runningtasks.get(i));
+				if (Config.DEBUG) {
+					System.out.println("Caching: "
+							+ runningtasks.get(i).getID());
+				}
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}
@@ -233,7 +240,13 @@ public class ComputerImpl extends UnicastRemoteObject implements Computer {
 							+ " is taken!");
 				}
 				Result result = execute(task);
-				addResult(result);
+				// addResult(result);
+				try {
+					resultQueue.put(result);
+				} catch (InterruptedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
 				if (Config.STATUSOUTPUT) {
 					System.out.println("Worker: Result " + result.getID()
 							+ " is added!");
@@ -244,8 +257,8 @@ public class ComputerImpl extends UnicastRemoteObject implements Computer {
 				// Bug here!
 				if (Config.AmeliorationFlag) {
 					if (result.getType() == Result.TASKRESULT) {
-						((TaskResult<?>) result)
-								.setRunningTasks(Config.CacheTaskNum);
+						 ((TaskResult<?>) result)
+						.setRunningTasks(Config.CacheTaskNum);
 						cacheTasks((TaskResult<?>) result);
 					}
 				}
@@ -269,17 +282,22 @@ public class ComputerImpl extends UnicastRemoteObject implements Computer {
 						.getSubTasks();
 				// Assign Successor Task with an Task ID
 				Task<?> successor = subtasks.get(0);
-				String taskid[] = task.getID().split(":"); 
-				successor.setID(task.getID().replace(":" + taskid[9], ":W" + makeTaskID()));
+				String taskid[] = task.getID().split(":");
+				successor.setID(task.getID().replace(":" + taskid[9],
+						":W" + makeTaskID()));
 				if (Config.STATUSOUTPUT) {
-					System.out.println("Worker: Successor " + successor.getID());
+					System.out
+							.println("Worker: Successor " + successor.getID());
 				}
+
 				// Assign other Ready Task with Task IDs
 				for (int i = 1; i < subtasks.size(); i++) {
 					Task<?> subtask = subtasks.get(i);
-					subtask.setID(task.getID().replace(":" + taskid[9], ":W" + makeTaskID()));
+					subtask.setID(task.getID().replace(":" + taskid[9],
+							":W" + makeTaskID()));
 					if (Config.STATUSOUTPUT) {
-						System.out.println("Worker: Subtask " + subtask.getID() +  " -- " + subtask.getArg().get(0));
+						System.out.println("Worker: Subtask " + subtask.getID()
+								+ " -- " + subtask.getArg().get(0));
 					}
 					subtask.setTargetID(successor.getID());
 				}

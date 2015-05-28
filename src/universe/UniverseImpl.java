@@ -12,6 +12,7 @@ import java.rmi.server.UnicastRemoteObject;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -138,11 +139,15 @@ public class UniverseImpl extends UnicastRemoteObject implements Universe,
 		}
 	}
 
-	synchronized private void checkPoint() {
+	private void checkPoint() {
 		try {
 			FileOutputStream fout = new FileOutputStream(recoveryFileName);
 			ObjectOutputStream oos = new ObjectOutputStream(fout);
-			oos.writeObject(this);
+			synchronized (readyTaskQueue) {
+				synchronized (successorTaskMap) {
+					oos.writeObject(this);
+				}
+			}
 			oos.close();
 			Logger.getLogger(this.getClass().getName()).log(Level.INFO,
 					"Checkpoint is taken.");
@@ -181,14 +186,7 @@ public class UniverseImpl extends UnicastRemoteObject implements Universe,
 	 * @return Task
 	 */
 	private Task<?> getReadyTask() {
-		try {
-			return readyTaskQueue.take();
-		} catch (InterruptedException e) {
-			if (Config.STATUSOUTPUT) {
-				System.out.println("Send Service is interrupted!");
-			}
-		}
-		return null;
+		return readyTaskQueue.poll();
 	}
 
 	/**
@@ -276,7 +274,7 @@ public class UniverseImpl extends UnicastRemoteObject implements Universe,
 		synchronized (readyTaskQueue) {
 			for (Task<?> task : readyTaskQueue) {
 				String taskID[] = task.getID().split(":");
-				if (taskID[0].equals(serverProxy.ID)) {
+				if (taskID[2].equals(serverProxy.ID)) {
 					readyTaskQueue.remove(task);
 				}
 			}
@@ -314,15 +312,20 @@ public class UniverseImpl extends UnicastRemoteObject implements Universe,
 	 */
 	private void unregister(SpaceProxy spaceProxy) {
 		spaceProxies.remove(spaceProxy.ID);
-		if (!spaceProxy.runningTaskMap.isEmpty()) {
-			for (String taskID : spaceProxy.runningTaskMap.keySet()) {
-				try {
-					readyTaskQueue.put(spaceProxy.runningTaskMap.get(taskID));
-					if (Config.STATUSOUTPUT) {
-						System.out.println("Save Space Task:" + taskID);
+		synchronized (readyTaskQueue) {
+			synchronized (spaceProxy.runningTaskMap) {
+				if (spaceProxy.runningTaskMap.isEmpty()) {
+					for (String taskID : spaceProxy.runningTaskMap.keySet()) {
+						try {
+							readyTaskQueue.put(spaceProxy.runningTaskMap
+									.get(taskID));
+							if (Config.STATUSOUTPUT) {
+								System.out.println("Save Space Task:" + taskID);
+							}
+						} catch (InterruptedException e) {
+							e.printStackTrace();
+						}
 					}
-				} catch (InterruptedException e) {
-					e.printStackTrace();
 				}
 			}
 		}
@@ -435,11 +438,13 @@ public class UniverseImpl extends UnicastRemoteObject implements Universe,
 						if (!task.getID().contains(":U")) {
 							task.setID(task.getID() + ":U" + makeTaskID());
 						} else {
-							String taskid[] = task.getID().split(":"); 
+							String taskid[] = task.getID().split(":");
 							task.setID(task.getID().replace(":" + taskid[4],
 									":U" + makeTaskID()));
 						}
-						universe.addReadyTask(task);
+						synchronized (universe.readyTaskQueue) {
+							universe.addReadyTask(task);
+						}
 						if (Config.DEBUG) {
 							System.out.println("Server Proxy: Task "
 									+ task.getID() + " is added!");
@@ -530,23 +535,26 @@ public class UniverseImpl extends UnicastRemoteObject implements Universe,
 							resultid.append(resultID[i]);
 							resultid.append(":");
 						}
-						//Have bug here. Effect further Result
+						// Have bug here. Effect further Result
 						resultid.deleteCharAt(resultid.length() - 1);
 						String taskID = resultid.toString();
-						synchronized (runningTaskMap) {
-							if (Config.DEBUG) {
-								System.out.println("Space Proxy: Result "
-										+ result.getID() + " is taken!");
+						synchronized (universe.readyTaskQueue) {
+							synchronized (universe.successorTaskMap) {
+								synchronized (runningTaskMap) {
+									if (Config.DEBUG) {
+										System.out
+												.println("Space Proxy: Result "
+														+ result.getID()
+														+ " is taken!");
+									}
+									result.process(universe, runningTaskMap);
+									runningTaskMap.remove(taskID);
+								}
 							}
-							result.process(universe, runningTaskMap);
-							runningTaskMap.remove(taskID);
 						}
 					} catch (RemoteException e) {
 						System.out.println("Receive Servcie: Space " + ID
 								+ " is Down!");
-						if (SpaceProxy.this.sendService.isAlive()) {
-							SpaceProxy.this.sendService.interrupt();
-						}
 						unregister(SpaceProxy.this);
 						return;
 						// If the Space is down abnormal, Save all tasks.
@@ -566,23 +574,37 @@ public class UniverseImpl extends UnicastRemoteObject implements Universe,
 				while (true) {
 					Task<?> task = null;
 					try {
-						task = universe.getReadyTask();
-						if (!task.getID().contains(":P")) {
-							task.setID(task.getID() + ":" + ID + ":P"
-									+ makeTaskID());
+						try {
+							Thread.sleep(new Random().nextInt(2000));
+						} catch (InterruptedException e) {
+							return;
 						}
-						synchronized (runningTaskMap) {
-							space.addTask(task);
-							runningTaskMap.put(task.getID(), task);
-							if (Config.DEBUG) {
-								System.out.println("Space Proxy: Task "
-										+ task.getID() + " is added!");
+						synchronized (universe.readyTaskQueue) {
+							task = universe.getReadyTask();
+							if (task == null) {
+								continue;
+							}
+							if (!task.getID().contains(":P")) {
+								task.setID(task.getID() + ":" + ID + ":P"
+										+ makeTaskID());
+							}
+							synchronized (runningTaskMap) {
+								space.addTask(task);
+								runningTaskMap.put(task.getID(), task);
+								if (Config.DEBUG) {
+									System.out.println("Space Proxy: Task "
+											+ task.getID() + " is added!");
+								}
 							}
 						}
 					} catch (RemoteException e) {
 						System.out.println("Send Service: Space " + ID
 								+ " is Down!");
-						universe.addReadyTask(task);
+						if (task != null) {
+							synchronized (universe.readyTaskQueue) {
+								universe.addReadyTask(task);
+							}
+						}
 						return;
 						// If the Space is down abnormal, Save all tasks.
 					}

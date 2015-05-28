@@ -15,7 +15,7 @@ import universe.UniverseImpl;
  * 
  */
 public abstract class Result implements Serializable {
-	private static final long serialVersionUID = 3823660517030582914L;
+	private static final long serialVersionUID = 5197752215627028297L;
 
 	/**
 	 * Value Result Type Identifier.
