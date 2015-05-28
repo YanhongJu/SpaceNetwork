@@ -49,7 +49,7 @@ public class ClientFibonacci extends Client<Integer,Integer> {
 		System.setSecurityManager(new SecurityManager());
 
 		String serverDomainName = args.length == 0 ? "localhost" : args[0];
-		ClientFibonacci client = new ClientFibonacci("ClientFibonacci1");
+		ClientFibonacci client = new ClientFibonacci("F");
 		client.begin();
 
 		int N = 20;

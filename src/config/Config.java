@@ -9,7 +9,7 @@ public class Config {
 	/**
 	 * Flag of Amelioration of Communication.
 	 */
-	public final static boolean AmeliorationFlag = false;
+	public final static boolean AmeliorationFlag = true;
 
 	/**
 	 * Flag of Space Direct Execution.

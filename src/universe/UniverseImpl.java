@@ -444,10 +444,12 @@ public class UniverseImpl extends UnicastRemoteObject implements Universe,
 						}
 						synchronized (universe.readyTaskQueue) {
 							universe.addReadyTask(task);
-						}
-						if (Config.DEBUG) {
-							System.out.println("Server Proxy: Task "
-									+ task.getID() + " is added!");
+							if (Config.DEBUG) {
+								System.out
+										.println("Universe-Server Proxy: Task "
+												+ task.getID()
+												+ " is added to Universe ReadyTaskQueue!");
+							}
 						}
 					} catch (RemoteException e) {
 						System.out.println("Send Service: Server " + ID
@@ -543,9 +545,11 @@ public class UniverseImpl extends UnicastRemoteObject implements Universe,
 								synchronized (runningTaskMap) {
 									if (Config.DEBUG) {
 										System.out
-												.println("Space Proxy: Result "
+												.println("Universe-Space Proxy: Result "
 														+ result.getID()
-														+ " is taken!");
+														+ "-"
+														+ result.isCoarse()
+														+ " is processing!");
 									}
 									result.process(universe, runningTaskMap);
 									runningTaskMap.remove(taskID);
@@ -592,8 +596,14 @@ public class UniverseImpl extends UnicastRemoteObject implements Universe,
 								space.addTask(task);
 								runningTaskMap.put(task.getID(), task);
 								if (Config.DEBUG) {
-									System.out.println("Space Proxy: Task "
-											+ task.getID() + " is added!");
+									System.out
+											.println("Universe-Space Proxy: Task "
+													+ task.getID()
+													+ "-"
+													+ task.getLayer()
+													+ "-"
+													+ task.isCoarse()
+													+ " is added to Space ReadyTaskQueue!");
 								}
 							}
 						}

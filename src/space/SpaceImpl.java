@@ -426,23 +426,40 @@ public class SpaceImpl extends UnicastRemoteObject implements Space {
 						Result result = computer.getResult();
 						if (result != null) {
 							if (Config.DEBUG) {
-								System.out.println("Computer Proxy: Result "
-										+ result.getID() + " is taken!");
+								System.out
+										.println("Space-Computer Proxy: Result "
+												+ result.getID()
+												+ "-"
+												+ result.isCoarse()
+												+ " is processing!");
 							}
 							synchronized (runningTaskMap) {
 								if (result.isCoarse()) {
 									space.addResult(result);
 									if (Config.DEBUG) {
 										System.out
-												.println("Computer Proxy: Result "
+												.println("	Result "
 														+ result.getID()
-														+ " is added!");
+														+ " is coarse, added to Space Result Queue!");
 									}
 									runningTaskMap.remove(result.getID());
 								} else {
 									if (!result.process(space, runningTaskMap,
 											intermediateResultQueue)) {
 										space.addResult(result);
+										if (Config.DEBUG) {
+											System.out
+													.println("	Result "
+															+ result.getID()
+															+ " is not coarse but should be added to Space Result Queue!");
+										}
+									} else {
+										if (Config.DEBUG) {
+											System.out
+													.println("	Result "
+															+ result.getID()
+															+ " is processed by Space!");
+										}
 									}
 									runningTaskMap.remove(result.getID());
 								}
@@ -511,8 +528,14 @@ public class SpaceImpl extends UnicastRemoteObject implements Space {
 							computer.addTask(task);
 							runningTaskMap.put(task.getID(), task);
 							if (Config.DEBUG) {
-								System.out.println("Computer Proxy: Task "
-										+ task.getID() + " is added!");
+								System.out
+										.println("Space-Computer Proxy: Task "
+												+ task.getID()
+												+ "-"
+												+ task.getLayer()
+												+ "-"
+												+ task.isCoarse()
+												+ " is added to Computer ReadyTaskQueue!");
 							}
 						}
 					} catch (RemoteException e) {

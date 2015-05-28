@@ -128,8 +128,8 @@ public class ValueResult<ValueType> extends Result {
 				.getSuccessorTask(targetTaskId);
 		if (successortask == null) {
 			if (Config.DEBUG) {
-				System.out.println("Successor " + targetTaskId
-						+ " is in Universe!");
+				System.out.println("	Result: Successor " + targetTaskId
+						+ " is not in Space!");
 			}
 			return false;
 		}
@@ -149,11 +149,14 @@ public class ValueResult<ValueType> extends Result {
 			} else {
 				// The successor task is moved from Successor Task Queue to
 				// Ready Task Queue.
-				space.successorToReady(successortask);
 				if (Config.DEBUG) {
-					System.out.println("Space -- Successor " + targetTaskId
-							+ " is runnable!");
+					System.out.println("	Result: " + successortask.getID()
+							+ "-" + successortask.getLayer() + "-"
+							+ successortask.isCoarse()
+							+ " is added to Space Ready Task Queue!");
 				}
+				space.successorToReady(successortask);
+
 			}
 		}
 		return true;
@@ -185,16 +188,24 @@ public class ValueResult<ValueType> extends Result {
 		SuccessorTask<ValueType> successortask = (SuccessorTask<ValueType>) universe
 				.getSuccessorTask(targetTaskId);
 		if (Config.DEBUG) {
-			if(successortask == null)
-				System.out.println("Successor " + targetTaskId + " is in where?");
+			if (successortask == null)
+				System.out.println("	Result:Successor " + targetTaskId
+						+ " is not in universe!");
 		}
 		// Set the argument in the target successor task at the target index.
 		successortask.setArgAt(targetArgIndex, this.value);
 		if (successortask.isRunnable()) {
 			// The successor task is moved from Successor Task Queue to
 			// Ready Task Queue.
+			if (Config.DEBUG) {
+				System.out.println("	Result: " + successortask.getID() + "-"
+						+ successortask.getLayer() + "-"
+						+ successortask.isCoarse()
+						+ " is added to Universe Ready Task Queue!");
+			}
 			universe.successorToReady(successortask);
 		}
+
 	}
 
 }

@@ -90,15 +90,8 @@ public class TaskResult<T> extends Result {
 			num = 0;
 		}
 		for (int i = 1; i <= num; i++) {
-			runningTasks.add(subTasks.remove(i));
-		}
-		if (Config.DEBUG) {
-			for (Task i : runningTasks) {
-				System.out.println("Running task " + i.getArg());
-			}
-			// System.out.println("SetRunningTasks Running Task Size: " +
-			// runningTasks.size());
-
+			Task task = subTasks.remove(i);
+			runningTasks.add(task);
 		}
 	}
 
@@ -120,46 +113,37 @@ public class TaskResult<T> extends Result {
 	public boolean process(final SpaceImpl space,
 			final Map<String, Task<?>> runningTaskMap,
 			final BlockingQueue<Result> intermediateResultQueue) {
-		if (Config.AmeliorationFlag) {
-			// Store the running tasks in the Computer Proxy Running Task Map.
-			for (int i = 0; i < runningTasks.size(); i++) {
-				runningTaskMap.put(
-						runningTasks.get(i).getID(), runningTasks.get(i));
-			}
-
-			// First task in subtasks is a successor. Put it into Space's
-			// Successor
-			// Task Queue.
-			space.addSuccessorTask(subTasks.get(0));
-
-			// Put rest tasks in subtasks into Space's Ready Task Queue.
-			for (int i = 1; i < subTasks.size(); i++) {
-				space.addReadyTask(subTasks.get(i));
-			}
-		} else {
-			for (int i = 0; i < runningTasks.size(); i++) {
-				space.addReadyTask(runningTasks.get(i));
-			}
-			space.addSuccessorTask(subTasks.get(0));
-			for (int i = 1; i < subTasks.size(); i++) {
-				space.addReadyTask(subTasks.get(i));
+		if (Config.DEBUG) {
+			if (runningTasks.size() == 0) {
+				System.out.println("	Result: RuningTask is empty!");
 			}
 		}
-		return true;
-	
-	/*	for (int i = 0; i < runningTasks.size(); i++) {
+		for (int i = 0; i < runningTasks.size(); i++) {
+			if (Config.DEBUG) {
+				System.out.println("	Result: RunningTask "
+						+ runningTasks.get(i).getID() + "-"
+						+ runningTasks.get(0).getLayer() + "-"
+						+ runningTasks.get(i).isCoarse());
+			}
 			runningTaskMap
 					.put(runningTasks.get(i).getID(), runningTasks.get(i));
 		}
-		space.addSuccessorTask(subTasks.get(0));
 		if (Config.DEBUG) {
-			System.out
-					.println("Space: Successor ID " + subTasks.get(0).getID());
+			System.out.println("	Result: Successor " + subTasks.get(0).getID()
+					+ "-" + subTasks.get(0).getLayer() + "-"
+					+ subTasks.get(0).isCoarse());
 		}
+		space.addSuccessorTask(subTasks.get(0));
 		for (int i = 1; i < subTasks.size(); i++) {
 			space.addReadyTask(subTasks.get(i));
+			if (Config.DEBUG) {
+				System.out.println("	Result: Subtask "
+						+ subTasks.get(i).getID() + "-"
+						+ subTasks.get(i).getLayer() + "-"
+						+ subTasks.get(i).isCoarse());
+			}
 		}
-		return true;*/
+		return true;
 	}
 
 	/**
@@ -176,13 +160,21 @@ public class TaskResult<T> extends Result {
 	@Override
 	public void process(UniverseImpl universe,
 			Map<String, Task<?>> runningTaskMap) {
+		if (Config.DEBUG) {
+			System.out.println("	Result: Successor " + subTasks.get(0).getID()
+					+ "-" + subTasks.get(0).getLayer() + "-"
+					+ subTasks.get(0).isCoarse());
+		}
 		universe.addSuccessorTask(subTasks.get(0));
 		for (int i = 1; i < subTasks.size(); i++) {
 			universe.addReadyTask(subTasks.get(i));
+			if (Config.DEBUG) {
+				System.out.println("	Result: Subtask "
+						+ subTasks.get(i).getID() + "-"
+						+ subTasks.get(0).getLayer() +"-"
+						+ subTasks.get(i).isCoarse());
+			}
 		}
-		if (Config.DEBUG) {
-			System.out.println("Universe: Successor ID "
-					+ subTasks.get(0).getID());
-		}
+
 	}
 }

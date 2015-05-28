@@ -71,7 +71,7 @@ public class ComputerImpl extends UnicastRemoteObject implements Computer {
 		if (Config.AmeliorationFlag) {
 			readyTaskQueue = new LinkedBlockingQueue<>(100);
 		} else {
-			readyTaskQueue = new LinkedBlockingQueue<>(1);
+			readyTaskQueue = new LinkedBlockingQueue<>(5);
 		}
 		if (Config.ComputerMultithreadFlag) {
 			// Get available processors in JVM
@@ -203,8 +203,8 @@ public class ComputerImpl extends UnicastRemoteObject implements Computer {
 			try {
 				readyTaskQueue.put(runningtasks.get(i));
 				if (Config.DEBUG) {
-					System.out.println("Caching: "
-							+ runningtasks.get(i).getID());
+					System.out
+							.println("	Cache: " + runningtasks.get(i).getID());
 				}
 			} catch (InterruptedException e) {
 				e.printStackTrace();
@@ -235,71 +235,94 @@ public class ComputerImpl extends UnicastRemoteObject implements Computer {
 				if (!task.getID().contains(":W")) {
 					task.setID(task.getID() + ":W" + makeTaskID());
 				}
-				if (Config.STATUSOUTPUT) {
-					System.out.println("Worker: Task " + task.getID()
-							+ " is taken!");
+				if (Config.DEBUG) {
+					System.out.println("Worker: Task " + task.getID() + "-"
+							+ task.getLayer() + "-" + task.isCoarse()
+							+ " is running!");
 				}
 				Result result = execute(task);
 				// addResult(result);
+				if (!result.isCoarse()) {
+					if (Config.AmeliorationFlag) {
+						if (result.getType() == Result.TASKRESULT) {
+							((TaskResult<?>) result)
+									.setRunningTasks(Config.CacheTaskNum);
+						}
+					}
+				}
 				try {
 					resultQueue.put(result);
+					if (Config.DEBUG) {
+						System.out.println("Worker: Result " + result.getID()
+								+ "-" + result.isCoarse()
+								+ " is added to Computer ResultQueue!");
+					}
 				} catch (InterruptedException e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
-				if (Config.STATUSOUTPUT) {
-					System.out.println("Worker: Result " + result.getID()
-							+ " is added!");
-				}
-				if (result.isCoarse()) {
-					continue;
-				}
 				// Bug here!
-				if (Config.AmeliorationFlag) {
-					if (result.getType() == Result.TASKRESULT) {
-						 ((TaskResult<?>) result)
-						.setRunningTasks(Config.CacheTaskNum);
-						cacheTasks((TaskResult<?>) result);
+				if (!result.isCoarse()) {
+					if (Config.AmeliorationFlag) {
+						if (result.getType() == Result.TASKRESULT) {
+							if (Config.DEBUG) {
+								List<?> runningTasks = ((TaskResult<?>) result)
+										.getRunningTasks();
+								System.out
+										.println("	Running task setted "
+												+ ((Task) runningTasks.get(0))
+														.getID()
+												+ "-"
+												+ ((Task) runningTasks.get(0))
+														.getLayer()
+												+ "-"
+												+ ((Task) runningTasks.get(0))
+														.isCoarse()
+												+ "-"
+												+ ((Task) runningTasks.get(0))
+														.getArg());
+							}
+							cacheTasks((TaskResult<?>) result);
+						}
 					}
 				}
 			}
 		}
+	}
 
-		/*
-		 * Execute the task and generate the result. Assign every subtask with
-		 * an task ID.
-		 */
-		private <T> Result execute(Task<T> task) {
-			// Call the task's execution method.
-			final Result result = task.execute();
-			// If the result is Value Result, return the result directly.
-			if (result.getType() == Result.VALUERESULT) {
-				return result;
-			} else {
-				// If the result is Task Result, assign subtasks with Task ID.
-				@SuppressWarnings("unchecked")
-				List<Task<T>> subtasks = (List<Task<T>>) ((TaskResult<T>) result)
-						.getSubTasks();
-				// Assign Successor Task with an Task ID
-				Task<?> successor = subtasks.get(0);
-				String taskid[] = task.getID().split(":");
-				successor.setID(task.getID().replace(":" + taskid[9],
+	/*
+	 * Execute the task and generate the result. Assign every subtask with an
+	 * task ID.
+	 */
+	private <T> Result execute(Task<T> task) {
+		final Result result = task.execute();
+		if (result.getType() == Result.VALUERESULT) {
+			return result;
+		} else {
+			// If the result is Task Result, assign subtasks with Task ID.
+			@SuppressWarnings("unchecked")
+			List<Task<T>> subtasks = (List<Task<T>>) ((TaskResult<T>) result)
+					.getSubTasks();
+			// Assign Successor Task with an Task ID
+			Task<?> successor = subtasks.get(0);
+			String taskid[] = task.getID().split(":");
+			successor.setID(task.getID().replace(":" + taskid[9],
+					":W" + makeTaskID()));
+			if (Config.DEBUG) {
+				System.out.println("	Successor: " + successor.getID() + "-"
+						+ successor.getLayer() + "-" + successor.isCoarse());
+			}
+
+			// Assign other Ready Task with Task IDs
+			for (int i = 1; i < subtasks.size(); i++) {
+				Task<?> subtask = subtasks.get(i);
+				subtask.setID(task.getID().replace(":" + taskid[9],
 						":W" + makeTaskID()));
-				if (Config.STATUSOUTPUT) {
-					System.out
-							.println("Worker: Successor " + successor.getID());
-				}
-
-				// Assign other Ready Task with Task IDs
-				for (int i = 1; i < subtasks.size(); i++) {
-					Task<?> subtask = subtasks.get(i);
-					subtask.setID(task.getID().replace(":" + taskid[9],
-							":W" + makeTaskID()));
-					if (Config.STATUSOUTPUT) {
-						System.out.println("Worker: Subtask " + subtask.getID()
-								+ " -- " + subtask.getArg().get(0));
-					}
-					subtask.setTargetID(successor.getID());
+				subtask.setTargetID(successor.getID());
+				if (Config.DEBUG) {
+					System.out.println("	Subtask: " + subtask.getID() + "-"
+							+ subtask.getLayer() + "-" + subtask.isCoarse()
+							+ "-" + subtask.getArg().get(0));
 				}
 			}
 			return result;

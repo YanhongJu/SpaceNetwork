@@ -396,8 +396,8 @@ public class ServerImpl extends UnicastRemoteObject implements Server {
 			task.setTargetID(task.getID() + ":" + "-1");
 			server.addTask(task);
 			if (Config.DEBUG) {
-				System.out.println("Client Proxy: Task " + task.getID()
-						+ " is added.");
+				System.out.println("Server-Client Proxy: Task " + task.getID()
+						+ " is added to Server ReadyTaskQueue.");
 			}
 			return task.getID();
 		}
