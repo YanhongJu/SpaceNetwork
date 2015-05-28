@@ -24,7 +24,7 @@ public class Config {
 	/**
 	 * Flag of Status Output
 	 */
-	public final static boolean STATUSOUTPUT = true;
+	public final static boolean STATUSOUTPUT = false;
 
 	/**
 	 * Flag of debug Output
@@ -50,10 +50,15 @@ public class Config {
 	 * Fibonacci Task Coarse Level
 	 *
 	 */
-	public static final int FibonacciCoarse = 1;
+	public static final int FibonacciCoarse = 3;
 
 	/**
 	 * TSP Task Corase Level
 	 */
 	public static final int TSPCoarse = 3;
+
+	/**
+	 * Computer Workload. Threashold of Ready Task Queue size.
+	 */
+	public static final int ComputerWorkload = 25;
 }

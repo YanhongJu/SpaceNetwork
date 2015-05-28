@@ -81,6 +81,16 @@ public abstract class Result implements Serializable {
 	}
 
 	/**
+	 * Set Result ID
+	 * 
+	 * @param resultid
+	 *            Result ID
+	 */
+	public void setID(String resultid) {
+		this.ID = resultid;
+	}
+
+	/**
 	 * Get the result type.
 	 * 
 	 * @return the resultType 0 if it is Value Result. 1 if it is Task Result.
@@ -88,7 +98,7 @@ public abstract class Result implements Serializable {
 	public int getType() {
 		return this.type;
 	}
-	
+
 	/**
 	 * Check if the Result is coarse or not.
 	 * 

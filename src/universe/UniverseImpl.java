@@ -330,7 +330,7 @@ public class UniverseImpl extends UnicastRemoteObject implements Universe,
 			}
 		}
 		Logger.getLogger(this.getClass().getName()).log(Level.WARNING,
-				"Space {0} i down.", spaceProxy.ID);
+				"Space {0} is down.", spaceProxy.ID);
 	}
 
 	private class ServerProxy {
@@ -531,15 +531,6 @@ public class UniverseImpl extends UnicastRemoteObject implements Universe,
 					try {
 						result = space.getResult();
 						// Check if it is the final result or not.
-						String resultID[] = result.getID().split(":");
-						StringBuffer resultid = new StringBuffer();
-						for (int i = 0; i <= 6; i++) {
-							resultid.append(resultID[i]);
-							resultid.append(":");
-						}
-						// Have bug here. Effect further Result
-						resultid.deleteCharAt(resultid.length() - 1);
-						String taskID = resultid.toString();
 						synchronized (universe.readyTaskQueue) {
 							synchronized (universe.successorTaskMap) {
 								synchronized (runningTaskMap) {
@@ -552,7 +543,7 @@ public class UniverseImpl extends UnicastRemoteObject implements Universe,
 														+ " is processing!");
 									}
 									result.process(universe, runningTaskMap);
-									runningTaskMap.remove(taskID);
+									runningTaskMap.remove(result.getID());
 								}
 							}
 						}
@@ -579,7 +570,7 @@ public class UniverseImpl extends UnicastRemoteObject implements Universe,
 					Task<?> task = null;
 					try {
 						try {
-							Thread.sleep(new Random().nextInt(2000));
+							Thread.sleep(5);
 						} catch (InterruptedException e) {
 							return;
 						}
@@ -606,6 +597,9 @@ public class UniverseImpl extends UnicastRemoteObject implements Universe,
 													+ " is added to Space ReadyTaskQueue!");
 								}
 							}
+						}
+						if (Config.STATUSOUTPUT) {
+							System.out.println(task.getID());
 						}
 					} catch (RemoteException e) {
 						System.out.println("Send Service: Space " + ID

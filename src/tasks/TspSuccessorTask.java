@@ -65,11 +65,9 @@ public class TspSuccessorTask extends SuccessorTask<TspData> {
 		}
 
 		TspData solved = new TspData(min, res, new LinkedList<Integer>());
-		boolean coarse = getLayer() - 1 == Config.FibonacciCoarse ? true
-				: false;
 		long taskEndTime = System.nanoTime();
 		return new ValueResult<TspData>(this.getID(), solved,
 				this.getTargetID(), this.getTargetSuccessorTaskArgIndex(),
-				coarse, taskStartTime, taskEndTime);
+				this.isCoarse(), taskStartTime, taskEndTime);
 	}
 }

@@ -95,7 +95,7 @@ public class ValueResult<ValueType> extends Result {
 	 * @return True if it is the final result. False otherwise.
 	 */
 	public boolean isFinal() {
-		if (targetTaskId.contains("-1")) {
+		if (targetTaskId.charAt(0) == '$') {
 			return true;
 		} else {
 			return false;
@@ -156,7 +156,6 @@ public class ValueResult<ValueType> extends Result {
 							+ " is added to Space Ready Task Queue!");
 				}
 				space.successorToReady(successortask);
-
 			}
 		}
 		return true;

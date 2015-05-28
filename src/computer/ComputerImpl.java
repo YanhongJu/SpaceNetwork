@@ -68,11 +68,7 @@ public class ComputerImpl extends UnicastRemoteObject implements Computer {
 	 */
 	public ComputerImpl() throws RemoteException {
 		resultQueue = new LinkedBlockingQueue<>();
-		if (Config.AmeliorationFlag) {
-			readyTaskQueue = new LinkedBlockingQueue<>(100);
-		} else {
-			readyTaskQueue = new LinkedBlockingQueue<>(5);
-		}
+		readyTaskQueue = new LinkedBlockingQueue<>();
 		if (Config.ComputerMultithreadFlag) {
 			// Get available processors in JVM
 			workerNum = Runtime.getRuntime().availableProcessors();
@@ -130,6 +126,21 @@ public class ComputerImpl extends UnicastRemoteObject implements Computer {
 	@Override
 	public int getWorkerNum() throws RemoteException {
 		return workerNum;
+	}
+
+	/**
+	 * Check if the Computer is busy. Call from Computer Proxy in Space.
+	 * 
+	 * @return True if Computer is busy. False otherwise.
+	 * @throws RemoteException
+	 *             Failed to connect to Computer.
+	 */
+	@Override
+	public boolean isBusy() throws RemoteException {
+		if (readyTaskQueue.size() > Config.ComputerWorkload * this.workerNum) {
+			return true;
+		}
+		return false;
 	}
 
 	/**
@@ -241,61 +252,67 @@ public class ComputerImpl extends UnicastRemoteObject implements Computer {
 							+ " is running!");
 				}
 				Result result = execute(task);
-				// addResult(result);
 				if (!result.isCoarse()) {
-					if (Config.AmeliorationFlag) {
-						if (result.getType() == Result.TASKRESULT) {
-							((TaskResult<?>) result)
-									.setRunningTasks(Config.CacheTaskNum);
-						}
+					if (Config.AmeliorationFlag
+							&& result.getType() == Result.TASKRESULT) {
+						((TaskResult<?>) result)
+								.setRunningTasks(Config.CacheTaskNum);
 					}
 				}
-				try {
-					resultQueue.put(result);
-					if (Config.DEBUG) {
-						System.out.println("Worker: Result " + result.getID()
-								+ "-" + result.isCoarse()
-								+ " is added to Computer ResultQueue!");
-					}
-				} catch (InterruptedException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
+				addResult(result);
+				if (Config.DEBUG) {
+					System.out.println("Worker: Result " + result.getID() + "-"
+							+ result.isCoarse()
+							+ " is added to Computer ResultQueue!");
 				}
-				// Bug here!
 				if (!result.isCoarse()) {
-					if (Config.AmeliorationFlag) {
-						if (result.getType() == Result.TASKRESULT) {
-							if (Config.DEBUG) {
-								List<?> runningTasks = ((TaskResult<?>) result)
-										.getRunningTasks();
-								System.out
-										.println("	Running task setted "
-												+ ((Task) runningTasks.get(0))
-														.getID()
-												+ "-"
-												+ ((Task) runningTasks.get(0))
-														.getLayer()
-												+ "-"
-												+ ((Task) runningTasks.get(0))
-														.isCoarse()
-												+ "-"
-												+ ((Task) runningTasks.get(0))
-														.getArg());
-							}
-							cacheTasks((TaskResult<?>) result);
+					if (Config.AmeliorationFlag
+							&& result.getType() == Result.TASKRESULT) {
+						if (Config.DEBUG) {
+							List<?> runningTasks = ((TaskResult<?>) result)
+									.getRunningTasks();
+							System.out.println("	Running task setted "
+									+ ((Task<?>) runningTasks.get(0)).getID()
+									+ "-"
+									+ ((Task<?>) runningTasks.get(0))
+											.getLayer()
+									+ "-"
+									+ ((Task<?>) runningTasks.get(0))
+											.isCoarse() + "-"
+									+ ((Task<?>) runningTasks.get(0)).getArg());
 						}
+						cacheTasks((TaskResult<?>) result);
 					}
+				}
+				if (Config.STATUSOUTPUT) {
+					System.out.println(result.getID());
 				}
 			}
+
 		}
 	}
 
 	/*
 	 * Execute the task and generate the result. Assign every subtask with an
 	 * task ID.
+	 *  F:1:0:S1:U1:0:P1:0:C1:W551 
+	 * ClientName:Num:Server:S:Universe:Space:P:Computer:C:W
+	 * !:ClientName:Num:Server:S:Universe:Space:P:Computer:C:W
 	 */
 	private <T> Result execute(Task<T> task) {
 		final Result result = task.execute();
+		if (result.getID().charAt(0) == '!') {
+			String resultID[] = result.getID().split(":");
+			StringBuffer resultid = new StringBuffer();
+			for (int i = 0; i <= 9; i++) {
+				resultid.append(resultID[i]);
+				resultid.append(":");
+			}
+			resultid.deleteCharAt(resultid.length() - 1);
+			result.setID(resultid.toString());
+			String taskid = task.getID().substring(2);
+			task.setID(taskid);
+		}
 		if (result.getType() == Result.VALUERESULT) {
 			return result;
 		} else {

@@ -31,6 +31,15 @@ public interface Computer extends Remote {
 	public int getWorkerNum() throws RemoteException;
 
 	/**
+	 * Check if the Computer is busy. Call from Computer Proxy in Space.
+	 * 
+	 * @return True if Computer is busy. False otherwise.
+	 * @throws RemoteException
+	 *             Failed to connect to Computer.
+	 */
+	public boolean isBusy() throws RemoteException;
+
+	/**
 	 * Add a task to Ready Task Queue. Call from Computer Proxy in Space.
 	 * 
 	 * @param task

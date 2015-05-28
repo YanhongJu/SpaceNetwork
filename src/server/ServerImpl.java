@@ -189,8 +189,10 @@ public class ServerImpl extends UnicastRemoteObject implements Server {
 	@Override
 	public boolean register(final String clientName, final String duration)
 			throws RemoteException {
-		if (clientName == null || clientProxies.containsKey(clientName)) {
-			System.out.println("Client Name already exists!");
+		if (clientName == null || clientName.charAt(0) == '!'
+				|| clientName.charAt(0) == '$'
+				|| clientProxies.containsKey(clientName)) {
+			System.out.println("Client Name is invalid!");
 			return false;
 		}
 		int timelimit;
@@ -249,7 +251,8 @@ public class ServerImpl extends UnicastRemoteObject implements Server {
 	}
 
 	@Override
-	public String submit(Task<?> task, String clientname) throws RemoteException {
+	public String submit(Task<?> task, String clientname)
+			throws RemoteException {
 		if (task == null) {
 			System.out.println("This Task is unacceptable!");
 			return null;
@@ -258,7 +261,7 @@ public class ServerImpl extends UnicastRemoteObject implements Server {
 			System.out.println("Client is not registered in the Server");
 			return null;
 		}
-		return clientProxies.get(clientname).submitTask(task);
+		return clientProxies.get(clientname).submitTask(task).substring(2);
 	}
 
 	@Override
@@ -391,9 +394,10 @@ public class ServerImpl extends UnicastRemoteObject implements Server {
 		 * @return Task ID
 		 */
 		private String submitTask(Task<?> task) {
-			task.setID(this.name + ":" + makeTaskID() + ":" + server.ID + ":S"
-					+ server.makeTaskID());
-			task.setTargetID(task.getID() + ":" + "-1");
+			String taskID = this.name + ":" + makeTaskID() + ":" + server.ID
+					+ ":S" + server.makeTaskID();
+			task.setID("!:" + taskID);
+			task.setTargetID("$:" + taskID);
 			server.addTask(task);
 			if (Config.DEBUG) {
 				System.out.println("Server-Client Proxy: Task " + task.getID()
