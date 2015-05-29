@@ -3,10 +3,11 @@ package result;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 
+import api.Result;
+import api.Task;
 import config.Config;
 import space.SpaceImpl;
 import task.SuccessorTask;
-import task.Task;
 import universe.UniverseImpl;
 
 /**
@@ -193,6 +194,12 @@ public class ValueResult<ValueType> extends Result {
 		}
 		// Set the argument in the target successor task at the target index.
 		successortask.setArgAt(targetArgIndex, this.value);
+		if (Config.DEBUG) {
+			System.out.println("	Result: " + successortask.getID() + "-"
+					+ successortask.getLayer() + "-"
+					+ successortask.isCoarse()
+					+ " value filled!");
+		}
 		if (successortask.isRunnable()) {
 			// The successor task is moved from Successor Task Queue to
 			// Ready Task Queue.

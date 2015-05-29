@@ -2,6 +2,8 @@ package task;
 
 import java.util.List;
 
+import api.Task;
+
 /**
  * 
  * A Ready Task is a task that is ready to run. In Divide and Conquer context,

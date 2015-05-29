@@ -15,11 +15,12 @@ import java.util.logging.Logger;
 import javax.swing.ImageIcon;
 import javax.swing.JLabel;
 
+import api.Client;
+import api.Server;
+import api.Task;
 import result.ValueResult;
-import server.Server;
-import task.Task;
-import tasks.TspData;
-import tasks.TspReadyTask;
+import tsp_tasks.TspData;
+import tsp_tasks.TspReadyTask;
 
 public class ClientTsp extends Client<List<Integer>, double[][]> {
 	private static final long serialVersionUID = 4192126821917742620L;

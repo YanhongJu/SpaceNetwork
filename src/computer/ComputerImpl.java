@@ -9,11 +9,14 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
-import result.Result;
+import api.Computer;
+import api.Result;
+import api.Space;
+import api.Task;
 import result.TaskResult;
-import space.Space;
-import task.Task;
 import config.Config;
 
 /**
@@ -233,6 +236,37 @@ public class ComputerImpl extends UnicastRemoteObject implements Computer {
 	}
 
 	/**
+	 * Generate a list of Task ID.
+	 * <p>
+	 * F:1:0:S1:U1:0:P1:0:C1:W551:#
+	 * </p>
+	 * <p>
+	 * root !:ClientName:Num:Server:S:Universe:Space:P:Computer:C:W
+	 * </p>
+	 * <p>
+	 * ClientName:Num:Server:S:Universe:Space:P:Computer:C:W
+	 * </p>
+	 * ClientName:Num:S1:Num:U1:P1:Num:C1:Num
+	 * 
+	 * @param oldID
+	 *            Old ID
+	 * @param num
+	 *            Number of new Tasks
+	 * @return List of Task ID
+	 */
+	private String[] makeTaskIDList(String oldID, int num) {
+		String[] IDs = new String[num];
+		String taskids[] = oldID.split(":");
+		taskids[7] = Integer.toString(this.ID);
+		for (int i = 0; i < num; i++) {
+			taskids[9] = "W" + makeTaskID();
+			String taskid = Stream.of(taskids).collect(Collectors.joining(":"));
+			IDs[i] = taskid;
+		}
+		return IDs;
+	}
+
+	/**
 	 * 
 	 * A Worker is a thread to get tasks from Computer Ready Queue and execute
 	 * them, put the results into Computer Result Task Queue.
@@ -242,6 +276,13 @@ public class ComputerImpl extends UnicastRemoteObject implements Computer {
 		@Override
 		public void run() {
 			while (true) {
+				// Debug Only
+
+				/*
+				 * try { Thread.sleep(5000); } catch (InterruptedException e) {
+				 * e.printStackTrace(); }
+				 */
+
 				Task<?> task = getReadyTask();
 				if (!task.getID().contains(":W")) {
 					task.setID(task.getID() + ":W" + makeTaskID());
@@ -295,9 +336,6 @@ public class ComputerImpl extends UnicastRemoteObject implements Computer {
 	/*
 	 * Execute the task and generate the result. Assign every subtask with an
 	 * task ID.
-	 *  F:1:0:S1:U1:0:P1:0:C1:W551 
-	 * ClientName:Num:Server:S:Universe:Space:P:Computer:C:W
-	 * !:ClientName:Num:Server:S:Universe:Space:P:Computer:C:W
 	 */
 	private <T> Result execute(Task<T> task) {
 		final Result result = task.execute();
@@ -320,11 +358,10 @@ public class ComputerImpl extends UnicastRemoteObject implements Computer {
 			@SuppressWarnings("unchecked")
 			List<Task<T>> subtasks = (List<Task<T>>) ((TaskResult<T>) result)
 					.getSubTasks();
+			String[] taskIDs = makeTaskIDList(task.getID(), subtasks.size());
 			// Assign Successor Task with an Task ID
 			Task<?> successor = subtasks.get(0);
-			String taskid[] = task.getID().split(":");
-			successor.setID(task.getID().replace(":" + taskid[9],
-					":W" + makeTaskID()));
+			successor.setID(taskIDs[0]);
 			if (Config.DEBUG) {
 				System.out.println("	Successor: " + successor.getID() + "-"
 						+ successor.getLayer() + "-" + successor.isCoarse());
@@ -333,9 +370,8 @@ public class ComputerImpl extends UnicastRemoteObject implements Computer {
 			// Assign other Ready Task with Task IDs
 			for (int i = 1; i < subtasks.size(); i++) {
 				Task<?> subtask = subtasks.get(i);
-				subtask.setID(task.getID().replace(":" + taskid[9],
-						":W" + makeTaskID()));
-				subtask.setTargetID(successor.getID());
+				subtask.setID(taskIDs[i]);
+				subtask.setTargetID(taskIDs[0]);
 				if (Config.DEBUG) {
 					System.out.println("	Subtask: " + subtask.getID() + "-"
 							+ subtask.getLayer() + "-" + subtask.isCoarse()

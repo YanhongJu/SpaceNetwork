@@ -15,10 +15,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import api.Result;
+import api.Server;
+import api.Task;
+import api.Universe;
 import config.Config;
-import result.Result;
-import task.Task;
-import universe.Universe;
 
 public class ServerImpl extends UnicastRemoteObject implements Server {
 	private static final long serialVersionUID = -7458792337176706359L;
@@ -394,8 +395,8 @@ public class ServerImpl extends UnicastRemoteObject implements Server {
 		 * @return Task ID
 		 */
 		private String submitTask(Task<?> task) {
-			String taskID = this.name + ":" + makeTaskID() + ":" + server.ID
-					+ ":S" + server.makeTaskID();
+			String taskID = this.name + ":" + makeTaskID() + ":S" + server.ID
+					+ ":" + server.makeTaskID();
 			task.setID("!:" + taskID);
 			task.setTargetID("$:" + taskID);
 			server.addTask(task);

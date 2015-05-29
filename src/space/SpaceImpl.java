@@ -9,20 +9,20 @@ import java.rmi.server.UnicastRemoteObject;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import computer.Computer;
+import api.Computer;
+import api.Result;
+import api.Space;
+import api.Task;
+import api.Universe;
 import config.Config;
-import result.Result;
 import result.ValueResult;
 import task.SuccessorTask;
-import task.Task;
-import universe.Universe;
 
 /**
  * 
@@ -287,7 +287,7 @@ public class SpaceImpl extends UnicastRemoteObject implements Space {
 			result.process(space, computerProxy.runningTaskMap,
 					computerProxy.intermediateResultQueue);
 			computerProxy.runningTaskMap.remove(result.getID());
-			if (Config.STATUSOUTPUT) {
+			if (Config.STATUSOUTPUT || Config.DEBUG) {
 				System.out.println("Unregister Result: " + result.getID() + "!"
 						+ ((ValueResult<?>) result).getTargetTaskID());
 			}
@@ -297,8 +297,8 @@ public class SpaceImpl extends UnicastRemoteObject implements Space {
 				try {
 					readyTaskQueue
 							.put(computerProxy.runningTaskMap.get(taskId));
-					if (Config.STATUSOUTPUT) {
-						System.out.println("Unregister@Task:" + taskId);
+					if (Config.STATUSOUTPUT || Config.DEBUG) {
+						System.out.println("Save Task:" + taskId);
 					}
 				} catch (InterruptedException e) {
 					e.printStackTrace();
@@ -330,8 +330,8 @@ public class SpaceImpl extends UnicastRemoteObject implements Space {
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
-		if (Config.STATUSOUTPUT) {
-			System.out.println("Space Direct Execution: " + result.getID());
+		if (Config.STATUSOUTPUT || Config.DEBUG) {
+			System.out.println("	Space Direct Execution: " + result.getID());
 		}
 	}
 
@@ -437,6 +437,19 @@ public class SpaceImpl extends UnicastRemoteObject implements Space {
 							}
 							synchronized (runningTaskMap) {
 								if (result.isCoarse()) {
+									// !:F:1:0:S1:U1:0:P1:0:C1
+									// !:F:1:0:S1:U1:0:P1
+									if (result.getID().charAt(0) == '!') {
+										String resultID[] = result.getID()
+												.split(":");
+										StringBuffer resultid = new StringBuffer();
+										for (int i = 0; i <= 7; i++) {
+											resultid.append(resultID[i]);
+											resultid.append(":");
+										}
+										resultid.deleteCharAt(resultid.length() - 1);
+										result.setID(resultid.toString());
+									}
 									space.addResult(result);
 									if (Config.DEBUG) {
 										System.out
@@ -517,35 +530,37 @@ public class SpaceImpl extends UnicastRemoteObject implements Space {
 							}
 							continue;
 						}
-						task = space.getReadyTask();
-						if (!task.getID().contains(":C")) {
-							task.setID(task.getID() + ":" + ID + ":C"
-									+ makeTaskID());
-						}
-						synchronized (runningTaskMap) {
-							computer.addTask(task);
-							runningTaskMap.put(task.getID(), task);
-							if (Config.DEBUG) {
-								System.out
-										.println("Space-Computer Proxy: Task "
-												+ task.getID()
-												+ "-"
-												+ task.getLayer()
-												+ "-"
-												+ task.isCoarse()
-												+ " is added to Computer ReadyTaskQueue!");
-							}
-						}
-						if (Config.STATUSOUTPUT) {
-							System.out.println(task.getID());
-						}
-					} catch (RemoteException e) {
+					} catch (RemoteException e1) {
 						System.out.println("Send Service: Computer " + ID
 								+ " is down!");
-						if (task != null) {
-							space.addReadyTask(task);
-						}
 						return;
+					}
+					task = space.getReadyTask();
+					if (!task.getID().contains(":C")) {
+						task.setID(task.getID() + ":C" + ID + ":"
+								+ makeTaskID());
+					}
+					synchronized (runningTaskMap) {
+						try {
+							computer.addTask(task);
+						} catch (RemoteException e) {
+							System.out.println("Send Service: Computer " + ID
+									+ " is down!");
+							if (task != null) {
+								space.addReadyTask(task);
+							}
+							return;
+						}
+						runningTaskMap.put(task.getID(), task);
+						if (Config.DEBUG) {
+							System.out.println("Space-Computer Proxy: Task "
+									+ task.getID() + "-" + task.getLayer()
+									+ "-" + task.isCoarse()
+									+ " is added to Computer ReadyTaskQueue!");
+						}
+					}
+					if (Config.STATUSOUTPUT) {
+						System.out.println(task.getID());
 					}
 				}
 			}

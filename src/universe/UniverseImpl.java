@@ -12,18 +12,18 @@ import java.rmi.server.UnicastRemoteObject;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Random;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import api.Result;
+import api.Server;
+import api.Space;
+import api.Task;
+import api.Universe;
 import config.Config;
-import result.Result;
-import server.Server;
-import space.Space;
-import task.Task;
 
 public class UniverseImpl extends UnicastRemoteObject implements Universe,
 		Serializable {
@@ -314,13 +314,22 @@ public class UniverseImpl extends UnicastRemoteObject implements Universe,
 		spaceProxies.remove(spaceProxy.ID);
 		synchronized (readyTaskQueue) {
 			synchronized (spaceProxy.runningTaskMap) {
-				if (spaceProxy.runningTaskMap.isEmpty()) {
+				if (!spaceProxy.runningTaskMap.isEmpty()) {
 					for (String taskID : spaceProxy.runningTaskMap.keySet()) {
 						try {
-							readyTaskQueue.put(spaceProxy.runningTaskMap
-									.get(taskID));
+							Task<?> task = spaceProxy.runningTaskMap
+									.get(taskID);
+							int index = task.getID().indexOf(":P");
+							if (index != -1) {
+								task.setID(task.getID().substring(0, index));
+							}
+							readyTaskQueue.put(task);
 							if (Config.STATUSOUTPUT) {
 								System.out.println("Save Space Task:" + taskID);
+							}
+							if (Config.DEBUG) {
+								System.out.println("Save Space Task:" + taskID
+										+ "	" + task.getID());
 							}
 						} catch (InterruptedException e) {
 							e.printStackTrace();
@@ -398,7 +407,7 @@ public class UniverseImpl extends UnicastRemoteObject implements Universe,
 			try {
 				return resultQueue.take();
 			} catch (InterruptedException e) {
-				if (Config.STATUSOUTPUT) {
+				if (Config.DEBUG) {
 					System.out.println("Receive Service is interrupted!");
 				}
 			}
@@ -435,33 +444,37 @@ public class UniverseImpl extends UnicastRemoteObject implements Universe,
 					Task<?> task = null;
 					try {
 						task = server.getTask();
-						if (!task.getID().contains(":U")) {
-							task.setID(task.getID() + ":U" + makeTaskID());
-						} else {
-							String taskid[] = task.getID().split(":");
-							task.setID(task.getID().replace(":" + taskid[4],
-									":U" + makeTaskID()));
-						}
-						synchronized (universe.readyTaskQueue) {
-							universe.addReadyTask(task);
-							if (Config.DEBUG) {
-								System.out
-										.println("Universe-Server Proxy: Task "
-												+ task.getID()
-												+ " is added to Universe ReadyTaskQueue!");
-							}
-						}
 					} catch (RemoteException e) {
 						System.out.println("Send Service: Server " + ID
 								+ " is Down!");
 						if (ServerProxy.this.receiveService.isAlive()) {
 							ServerProxy.this.receiveService.interrupt();
 						}
+						try {
+							receiveService.join();
+						} catch (InterruptedException e1) {
+							e1.printStackTrace();
+						}
 						unregister(ServerProxy.this);
 						return;
-						// If the Server is down abnormally, should Clean the
-						// Server. Maybe in future. Discard the task.
 					}
+					// !:F:1:S0:1:U1
+					if (!task.getID().contains(":U")) {
+						task.setID(task.getID() + ":U" + makeTaskID());
+					} else {
+						String taskid[] = task.getID().split(":");
+						task.setID(task.getID().replace(":" + taskid[4],
+								":U" + makeTaskID()));
+					}
+					synchronized (universe.readyTaskQueue) {
+						universe.addReadyTask(task);
+						if (Config.DEBUG) {
+							System.out.println("Universe-Server Proxy: Task "
+									+ task.getID()
+									+ " is added to Universe ReadyTaskQueue!");
+						}
+					}
+
 				}
 			}
 		}
@@ -491,7 +504,12 @@ public class UniverseImpl extends UnicastRemoteObject implements Universe,
 		/**
 		 * Send Service
 		 */
-		private final SendService sendService;
+		private SendService sendService;
+
+		/**
+		 * Remote Exception flag
+		 */
+		private boolean isInterrupt;
 
 		/**
 		 * Receive Service
@@ -501,6 +519,7 @@ public class UniverseImpl extends UnicastRemoteObject implements Universe,
 		public SpaceProxy(Space space, int id) {
 			this.space = space;
 			this.ID = id;
+			this.isInterrupt = false;
 			this.runningTaskMap = Collections.synchronizedMap(new HashMap<>());
 			this.receiveService = new ReceiveService();
 			this.sendService = new SendService();
@@ -530,29 +549,33 @@ public class UniverseImpl extends UnicastRemoteObject implements Universe,
 					Result result = null;
 					try {
 						result = space.getResult();
-						// Check if it is the final result or not.
-						synchronized (universe.readyTaskQueue) {
-							synchronized (universe.successorTaskMap) {
-								synchronized (runningTaskMap) {
-									if (Config.DEBUG) {
-										System.out
-												.println("Universe-Space Proxy: Result "
-														+ result.getID()
-														+ "-"
-														+ result.isCoarse()
-														+ " is processing!");
-									}
-									result.process(universe, runningTaskMap);
-									runningTaskMap.remove(result.getID());
-								}
-							}
-						}
 					} catch (RemoteException e) {
 						System.out.println("Receive Servcie: Space " + ID
 								+ " is Down!");
+						isInterrupt = true;
+						try {
+							sendService.join();
+						} catch (InterruptedException e1) {
+							e1.printStackTrace();
+						}
 						unregister(SpaceProxy.this);
 						return;
-						// If the Space is down abnormal, Save all tasks.
+					}
+					synchronized (universe.readyTaskQueue) {
+						synchronized (universe.successorTaskMap) {
+							synchronized (runningTaskMap) {
+								if (Config.DEBUG) {
+									System.out
+											.println("Universe-Space Proxy: Result "
+													+ result.getID()
+													+ "-"
+													+ result.isCoarse()
+													+ " is processing!");
+								}
+								result.process(universe, runningTaskMap);
+								runningTaskMap.remove(result.getID());
+							}
+						}
 					}
 				}
 			}
@@ -566,53 +589,49 @@ public class UniverseImpl extends UnicastRemoteObject implements Universe,
 		private class SendService extends Thread {
 			@Override
 			public void run() {
-				while (true) {
+				while (!isInterrupt) {
 					Task<?> task = null;
 					try {
-						try {
-							Thread.sleep(5);
-						} catch (InterruptedException e) {
-							return;
-						}
-						synchronized (universe.readyTaskQueue) {
-							task = universe.getReadyTask();
-							if (task == null) {
-								continue;
-							}
-							if (!task.getID().contains(":P")) {
-								task.setID(task.getID() + ":" + ID + ":P"
-										+ makeTaskID());
-							}
-							synchronized (runningTaskMap) {
-								space.addTask(task);
-								runningTaskMap.put(task.getID(), task);
-								if (Config.DEBUG) {
-									System.out
-											.println("Universe-Space Proxy: Task "
-													+ task.getID()
-													+ "-"
-													+ task.getLayer()
-													+ "-"
-													+ task.isCoarse()
-													+ " is added to Space ReadyTaskQueue!");
-								}
-							}
-						}
-						if (Config.STATUSOUTPUT) {
-							System.out.println(task.getID());
-						}
-					} catch (RemoteException e) {
-						System.out.println("Send Service: Space " + ID
-								+ " is Down!");
-						if (task != null) {
-							synchronized (universe.readyTaskQueue) {
-								universe.addReadyTask(task);
-							}
-						}
+						Thread.sleep(5);
+					} catch (InterruptedException e) {
 						return;
-						// If the Space is down abnormal, Save all tasks.
+					}
+					synchronized (universe.readyTaskQueue) {
+						task = universe.getReadyTask();
+						if (task == null) {
+							continue;
+						}
+						if (!task.getID().contains(":P")) {
+							task.setID(task.getID() + ":P" + ID + ":"
+									+ makeTaskID());
+						}
+						synchronized (runningTaskMap) {
+							try {
+								space.addTask(task);
+							} catch (RemoteException e) {
+								System.out.println("Send Service: Space " + ID
+										+ " is Down!");
+								universe.addReadyTask(task);
+								return;
+							}
+							runningTaskMap.put(task.getID(), task);
+							if (Config.DEBUG) {
+								System.out
+										.println("Universe-Space Proxy: Task "
+												+ task.getID()
+												+ "-"
+												+ task.getLayer()
+												+ "-"
+												+ task.isCoarse()
+												+ " is added to Space ReadyTaskQueue!");
+							}
+						}
+					}
+					if (Config.STATUSOUTPUT) {
+						System.out.println(task.getID());
 					}
 				}
+				System.out.println("Send Service: Space " + ID + " is Down!");
 			}
 		}
 	}

@@ -5,7 +5,7 @@ package config;
  * Configuration of Space and Computer.
  *
  */
-public class Config {
+public abstract class Config {
 	/**
 	 * Flag of Amelioration of Communication.
 	 */
@@ -47,18 +47,8 @@ public class Config {
 	public static final int CacheTaskNum = 1;
 
 	/**
-	 * Fibonacci Task Coarse Level
-	 *
-	 */
-	public static final int FibonacciCoarse = 3;
-
-	/**
-	 * TSP Task Corase Level
-	 */
-	public static final int TSPCoarse = 3;
-
-	/**
 	 * Computer Workload. Threashold of Ready Task Queue size.
 	 */
-	public static final int ComputerWorkload = 25;
+	public static final int ComputerWorkload = 4;
+
 }

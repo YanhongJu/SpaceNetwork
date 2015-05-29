@@ -1,5 +1,5 @@
 /**
- * Contains interface/abstract class definition of Result, Space and Task.
+ * Contains interface/abstract class definition of all needed classes.
  * 
  */
 package api;

@@ -2,6 +2,8 @@ package task;
 
 import java.util.List;
 
+import api.Task;
+
 public abstract class SuccessorTask<T> extends Task<T> {
 	private static final long serialVersionUID = 7837344432049161528L;
 	/**

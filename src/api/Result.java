@@ -14,27 +14,22 @@ import universe.UniverseImpl;
  * 
  */
 public abstract class Result implements Serializable {
-	private static final long serialVersionUID = 3823660517030582914L;
+	private static final long serialVersionUID = 5197752215627028297L;
 
 	/**
 	 * Value Result Type Identifier.
 	 */
-	public static final int VALUERESULT = 0;
+	public static final Integer VALUERESULT = 0;
 
 	/**
 	 * Task Result Type Identifier.
 	 */
-	public static final int TASKRESULT = 1;
+	public static final Integer TASKRESULT = 1;
 
 	/**
 	 * Result ID, same as its associated task ID.
 	 */
-	private String ResultId;
-
-	/**
-	 * Coarse flag.
-	 */
-	private boolean coarse;
+	private String ID;
 
 	/**
 	 * Task start time.
@@ -49,7 +44,12 @@ public abstract class Result implements Serializable {
 	/**
 	 * Result type.
 	 */
-	private int ResultType;
+	private Integer type;
+
+	/**
+	 * Coarse Flag.
+	 */
+	private boolean coarse;
 
 	/**
 	 * Constructor of Result.
@@ -61,10 +61,50 @@ public abstract class Result implements Serializable {
 	 * @param taskEndTime
 	 *            Task end time.
 	 */
-	public Result(String resultId, long taskStartTime, long taskEndTime) {
-		this.ResultId = resultId;
+	public Result(String resultId, Integer resultType, boolean coarse,
+			long taskStartTime, long taskEndTime) {
+		this.ID = resultId;
+		this.type = resultType;
+		this.coarse = coarse;
 		this.taskStartTime = taskStartTime;
 		this.taskEndTime = taskEndTime;
+	}
+
+	/**
+	 * Get the result Id.
+	 * 
+	 * @return the resultId Result Id.
+	 */
+	public String getID() {
+		return this.ID;
+	}
+
+	/**
+	 * Set Result ID
+	 * 
+	 * @param resultid
+	 *            Result ID
+	 */
+	public void setID(String resultid) {
+		this.ID = resultid;
+	}
+
+	/**
+	 * Get the result type.
+	 * 
+	 * @return the resultType 0 if it is Value Result. 1 if it is Task Result.
+	 */
+	public int getType() {
+		return this.type;
+	}
+
+	/**
+	 * Check if the Result is coarse or not.
+	 * 
+	 * @return True is the Result is coarse. False otherwise.
+	 */
+	public boolean isCoarse() {
+		return this.coarse;
 	}
 
 	/**
@@ -74,73 +114,7 @@ public abstract class Result implements Serializable {
 	 *         start time.
 	 */
 	public long getTaskRuntime() {
-		return taskEndTime - taskStartTime;
-	}
-
-	/**
-	 * Get the task start time.
-	 * 
-	 * @return the taskStartTime Task start time.
-	 */
-	public long getTaskStartTime() {
-		return taskStartTime;
-	}
-
-	/**
-	 * Set the task start time.
-	 * 
-	 * @param taskStartTime
-	 *            the taskStartTime to set
-	 */
-	public void setTaskStartTime(long taskStartTime) {
-		this.taskStartTime = taskStartTime;
-	}
-
-	/**
-	 * Get the task end time.
-	 * 
-	 * @return the taskEndTime Task end time.
-	 */
-	public long getTaskEndTime() {
-		return taskEndTime;
-	}
-
-	/**
-	 * Set the task end time.
-	 * 
-	 * @param taskEndTime
-	 *            the taskEndTime to set
-	 */
-	public void setTaskEndTime(long taskEndTime) {
-		this.taskEndTime = taskEndTime;
-	}
-
-	/**
-	 * Get the result Id.
-	 * 
-	 * @return the resultId Result Id.
-	 */
-	public String getResultId() {
-		return ResultId;
-	}
-
-	/**
-	 * Get the result type.
-	 * 
-	 * @return the resultType 0 if it is Value Result. 1 if it is Task Result.
-	 */
-	public int getResultType() {
-		return this.ResultType;
-	}
-
-	/**
-	 * Set the Result Type. 0 for Value Result, 1 for Task Result.
-	 * 
-	 * @param resultType
-	 *            the resultType to set
-	 */
-	public void setResultType(int resultType) {
-		this.ResultType = resultType;
+		return this.taskEndTime - this.taskStartTime;
 	}
 
 	/**
@@ -158,8 +132,8 @@ public abstract class Result implements Serializable {
 	 * @return The status of processing. True if processed successfully, false
 	 *         otherwise.
 	 */
-	public abstract void process(final SpaceImpl space,
-			final Map<String, Task> runningTaskMap,
+	public abstract boolean process(final SpaceImpl space,
+			final Map<String, Task<?>> runningTaskMap,
 			final BlockingQueue<Result> resultQueue);
 
 	/**
@@ -174,27 +148,7 @@ public abstract class Result implements Serializable {
 	 *         otherwise.
 	 */
 	public abstract void process(final UniverseImpl universe,
-			final Map<String, Task> runningTaskMap);
-
-	/**
-	 * Check if the Result is coarse or not.
-	 * 
-	 * @return True is the Result is coarse. False otherwise.
-	 */
-	public boolean isCoarse() {
-		return this.coarse;
-	}
-
-	/**
-	 * Set if the Result is coarse or not.
-	 * 
-	 * @param coarse
-	 *            True if the Result is coarse. False otherwise.
-	 * 
-	 */
-	public void setCoarse(boolean coarse) {
-		this.coarse = coarse;
-	}
+			final Map<String, Task<?>> runningTaskMap);
 
 	/**
 	 * Output format of Result runtime.

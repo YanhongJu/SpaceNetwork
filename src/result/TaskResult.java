@@ -5,9 +5,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 
+import api.Result;
+import api.Task;
 import config.Config;
 import space.SpaceImpl;
-import task.Task;
 import universe.UniverseImpl;
 
 /**
@@ -90,7 +91,7 @@ public class TaskResult<T> extends Result {
 			num = 0;
 		}
 		for (int i = 1; i <= num; i++) {
-			Task task = subTasks.remove(i);
+			Task<T> task = subTasks.remove(i);
 			runningTasks.add(task);
 		}
 	}
